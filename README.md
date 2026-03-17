@@ -10,10 +10,6 @@
 
 ## THIS PORT IS HIGHlY EXPERIMENTAL AND POTENTIALLY UNSTABLE. REPORT BUGS
 
-features removed for stability
-- Tracers
-- NameTags
-
 </div>
 
 ## 🔧 Improvements Over Original Argon Client
