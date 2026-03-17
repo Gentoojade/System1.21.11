@@ -151,7 +151,7 @@ For those who are unfamiliar with the license, here is a summary of its main poi
 
 System uses Gradle to build the client. Install the latest version of Gradle onto your computer and install IntelliJ IDEA Ultimate, or use the free community edition.
 
-1. Clone the repository using `git clone --recurse-submodules https://github.com/DLindustries/System`.
+1. Clone the repository using `git clone --recurse-submodules https://github.com/Gentoojade/System1.21.11.git`.
 2. CD into the local repository with the command `cd System1.21.11`.
 3. IF ON LINUX RUN 'chmod +x gradlew 
 4. Run `./gradlew genSources`.
