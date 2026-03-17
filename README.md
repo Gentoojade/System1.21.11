@@ -6,11 +6,6 @@
 
 [![Github Release Downloads](https://img.shields.io/github/downloads/DLindustries/System/total?label=Github%20Release%20Downloads&style=flat-square)](https://github.com/DLindustries/System/releases)
 
-
-
-[![Watch the video](https://img.youtube.com/vi/59nsohCazPo/0.jpg)](https://www.youtube.com/watch?v=59nsohCazPo)
-
-
 <a href="https://discord.gg/yynpznJVkC"><img src="https://invidget.switchblade.xyz/yynpznJVkC" alt="https://discord.gg/yynpznJVkC"/></a><br>
 
 ## THIS PORT IS HIGHlY EXPERIMENTAL AND POTENTIALLY UNSTABLE. REPORT BUGS
@@ -18,8 +13,6 @@
 features removed for stability
 - Tracers
 - NameTags
-
-
 
 </div>
 
@@ -70,8 +63,6 @@ This fork is approximately **75% based on the original Argon**, but with focused
 
 
 
-
-
 ## How to use System
 
 1. Download the latest version of system (Jar file only)
@@ -85,15 +76,17 @@ This fork is approximately **75% based on the original Argon**, but with focused
 
 
 ## GUI
+<img width="2560" height="1440" alt="Screenshot_20260317_171945" src="https://github.com/user-attachments/assets/4f7fe84d-1a8e-42af-b21e-1a37c2358815" />
 
+<img width="2560" height="1440" alt="Screenshot_20260317_172054" src="https://github.com/user-attachments/assets/00cd1753-a34f-45ba-9162-1b8225742bd9" />
 
-![gui](https://github.com/user-attachments/assets/105ce9a6-8dfd-446d-9b79-277b9ec9e015)
+<img width="2560" height="1440" alt="Screenshot_20260317_174603" src="https://github.com/user-attachments/assets/eed33cd5-514d-4c97-8fc5-d5b5aa811aa9" />
 
-![Screenshot ](https://github.com/user-attachments/assets/ec2128d5-e158-4aea-93ce-b9c55f5418e0)
+**themes**
 
-![Screenshot ](https://github.com/user-attachments/assets/23832c9f-33e0-438f-86b9-a5bc885b9ee2)
-![Screenshot ](https://github.com/user-attachments/assets/b5747333-413d-40ad-b40c-35d272b5d9b6)
+<img width="2560" height="1440" alt="Screenshot_20260317_174613" src="https://github.com/user-attachments/assets/12bc143f-af34-45d7-a740-6bd96a1faed2" />
 
+<img width="2560" height="1440" alt="Screenshot_20260317_174617" src="https://github.com/user-attachments/assets/07f161bf-8c35-4d2a-b080-092f04c3f517" />
 
 ## Configs
 
@@ -131,10 +124,6 @@ Most modules bypasses. If you want safety, then:
 - you can use dtapsetup
 
 **This is only a guide/general idea. For your own safety, i HIGHLY recommend you test your configs on a anticheat test server. BEFORE playing any of your favourite servers.**
-
-
-
-
 
 
 ## Issues
