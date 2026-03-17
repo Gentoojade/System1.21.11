@@ -3,49 +3,46 @@ package dlindustries.vigillant.system.module.modules.mace;
 import dlindustries.vigillant.system.event.events.TickListener;
 import dlindustries.vigillant.system.module.Category;
 import dlindustries.vigillant.system.module.Module;
-import dlindustries.vigillant.system.module.setting.KeybindSetting; // Added
+import dlindustries.vigillant.system.module.setting.KeybindSetting;
 import dlindustries.vigillant.system.module.setting.NumberSetting;
 import dlindustries.vigillant.system.utils.EncryptedString;
-import dlindustries.vigillant.system.utils.KeyUtils; // Added
+import dlindustries.vigillant.system.utils.KeyUtils;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 import net.minecraft.util.Hand;
 
 public class FireworkMacro extends Module implements TickListener {
 
-    private final KeybindSetting activateKey = new KeybindSetting(EncryptedString.of("Activate Key"), 32, false); // Default: Spacebar owner preference
-    private final NumberSetting switchDelay = new NumberSetting(EncryptedString.of("Switch Delay"), 0, 20, 1, 1);
-    private final NumberSetting fireworkSlot = new NumberSetting(EncryptedString.of("Firework Slot"), 1, 9, 3, 1)
-            .setDescription(EncryptedString.of("Slot 1-9 for fireworks"));
-    private final NumberSetting restoreSlot = new NumberSetting(EncryptedString.of("Restore Slot"), 1, 9, 1, 1)
-            .setDescription(EncryptedString.of("Slot 1-9 to restore"));
-
+    private final KeybindSetting activateKey = new KeybindSetting(EncryptedString.of("Activate Key"), 32, false);
+    private final NumberSetting switchDelay = new NumberSetting(EncryptedString.of("Switch Delay (ms)"), 0, 250, 50, 1)
+            .setDescription(EncryptedString.of("Delay in milliseconds for using firework"));
+    private static final int USE_DELAY_MS = 50;
     private boolean active, hasSwitched, hasUsed, hasSwitchedBack;
-    private int switchClock, useClock, switchBackClock;
-    private boolean wasKeyPressed; // Tracks key press state
-
+    private long switchStartTime, useStartTime, switchBackStartTime;
+    private boolean wasKeyPressed;
+    private int originalSlot;
+    private int fireworkSlotIndex = -1;
     public FireworkMacro() {
         super(
                 EncryptedString.of("Firework Macro"),
-                EncryptedString.of("Press a key while flying to use fireworks"),
+                EncryptedString.of("Press a key while flying to automatically use fireworks"),
                 -1,
                 Category.mace
         );
-        addSettings(activateKey, switchDelay, fireworkSlot, restoreSlot);
+        addSettings(activateKey, switchDelay);
     }
-
     @Override
     public void onEnable() {
         eventManager.add(TickListener.class, this);
         reset();
         super.onEnable();
     }
-
     @Override
     public void onDisable() {
         eventManager.remove(TickListener.class, this);
         reset();
         super.onDisable();
     }
-
     @Override
     public void onTick() {
         if (mc.currentScreen != null) return;
@@ -54,64 +51,74 @@ public class FireworkMacro extends Module implements TickListener {
         handleFlightMonitoring();
         handleFireworkSequence();
     }
-
     private void handleKeyDetection() {
         boolean keyPressed = KeyUtils.isKeyPressed(activateKey.getKey());
-
-
         if (keyPressed && !wasKeyPressed) {
             if (mc.player != null && mc.player.isGliding() && !active) {
-                active = true;
+                int foundSlot = findFireworkSlot();
+                if (foundSlot != -1) {
+                    originalSlot = mc.player.getInventory().getSelectedSlot();
+                    fireworkSlotIndex = foundSlot;
+                    active = true;
+                }
             }
         }
         wasKeyPressed = keyPressed;
     }
-
+    private int findFireworkSlot() {
+        if (mc.player == null) return -1;
+        for (int i = 0; i < 9; i++) {
+            ItemStack stack = mc.player.getInventory().getStack(i);
+            if (!stack.isEmpty() && stack.getItem() == Items.FIREWORK_ROCKET) {
+                return i;
+            }
+        }
+        return -1;
+    }
     private void handleFlightMonitoring() {
         if (mc.player == null) return;
-
         if (active && !mc.player.isGliding()) {
             reset();
         }
     }
-
     private void handleFireworkSequence() {
         if (!active || mc.player == null) return;
-
+        long now = System.currentTimeMillis();
         if (!hasSwitched) {
-            if (switchClock < switchDelay.getValueInt()) {
-                switchClock++;
-                return;
+            if (switchStartTime == 0) {
+                switchStartTime = now;
+            } else if (now - switchStartTime >= switchDelay.getValueInt()) {
+                mc.player.getInventory().setSelectedSlot(fireworkSlotIndex);
+                hasSwitched = true;
+                switchStartTime = 0;
             }
-            mc.player.getInventory().setSelectedSlot(fireworkSlot.getValueInt() - 1);
-            hasSwitched = true;
-            switchClock = 0;
         } else if (!hasUsed) {
-            if (useClock < 1) {
-                useClock++;
-                return;
+            if (useStartTime == 0) {
+                useStartTime = now;
+            } else if (now - useStartTime >= USE_DELAY_MS) {
+                mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
+                hasUsed = true;
+                useStartTime = 0;
             }
-            mc.interactionManager.interactItem(mc.player, Hand.MAIN_HAND);
-            hasUsed = true;
-            useClock = 0;
         } else if (!hasSwitchedBack) {
-            if (switchBackClock < switchDelay.getValueInt()) {
-                switchBackClock++;
-                return;
+            if (switchBackStartTime == 0) {
+                switchBackStartTime = now;
+            } else if (now - switchBackStartTime >= switchDelay.getValueInt()) {
+                mc.player.getInventory().setSelectedSlot(originalSlot);
+                hasSwitchedBack = true;
+                switchBackStartTime = 0;
+                reset();
             }
-            mc.player.getInventory().setSelectedSlot(restoreSlot.getValueInt() - 1);
-            hasSwitchedBack = true;
-            reset();
         }
     }
-
     private void reset() {
         active = false;
         hasSwitched = false;
         hasUsed = false;
         hasSwitchedBack = false;
-        switchClock = 0;
-        useClock = 0;
-        switchBackClock = 0;
+        switchStartTime = 0;
+        useStartTime = 0;
+        switchBackStartTime = 0;
+        fireworkSlotIndex = -1;
     }
 }

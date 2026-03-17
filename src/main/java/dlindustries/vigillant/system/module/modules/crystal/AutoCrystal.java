@@ -37,30 +37,29 @@ public final class AutoCrystal extends Module implements TickListener, ItemUseLi
 
 	private final BooleanSetting LootProtect = new BooleanSetting(EncryptedString.of("Loot protect"), false)
 			.setDescription(EncryptedString.of("Won't crystal if a dead player is nearby"));
-	private final BooleanSetting fakePunch = new BooleanSetting(EncryptedString.of("Fake Punch"), false)
+	private final BooleanSetting fakePunch = new BooleanSetting(EncryptedString.of("Fake Punch"), true)
 			.setDescription(EncryptedString.of("Will hit every entity and block if you miss a hitcrystal"));
-	private final BooleanSetting clickSimulation = new BooleanSetting(EncryptedString.of("Click Simulation"), true)
+	private final BooleanSetting clickSimulation = new BooleanSetting(EncryptedString.of("Click Simulation"), false)
 			.setDescription(EncryptedString.of("Makes the CPS hud think you're legit"));
-	private final BooleanSetting damageTick = new BooleanSetting(EncryptedString.of("Damage Tick"), false)
+	private final BooleanSetting damageTick = new BooleanSetting(EncryptedString.of("Damage Tick"), true)
 			.setDescription(EncryptedString.of("Times your crystals for a perfect d-tap"));
 	private final BooleanSetting antiWeakness = new BooleanSetting(EncryptedString.of("Anti-Weakness"), false)
 			.setDescription(EncryptedString.of("Silently switches to a sword and then hits the crystal if you have weakness"));
-
-	private final NumberSetting particleChance = new NumberSetting(EncryptedString.of("Particle Chance"), 0, 100, 20, 1)
+	private final NumberSetting particleChance = new NumberSetting(EncryptedString.of("Particle Chance"), 0, 100, 35, 1)
 			.setDescription(EncryptedString.of("Adds block breaking particles to make it seem more legit from your POV (Only works with fake punch)"));
-
+	private final BooleanSetting noAir = new BooleanSetting(EncryptedString.of("No Air"), true)
+			.setDescription(EncryptedString.of("Doesn't crystal if in air"));
 	private int placeClock;
 	private int breakClock;
 	public boolean crystalling;
-
 	public AutoCrystal() {
 		super(EncryptedString.of("Auto Crystal"),
 				EncryptedString.of("Automatically crystals fast for you"),
 				-1,
 				Category.CRYSTAL);
-		addSettings(activateKey, placeDelay, breakDelay, placeChance, breakChance, LootProtect, fakePunch, clickSimulation, damageTick, antiWeakness, particleChance);
+		addSettings(activateKey, placeDelay, breakDelay, placeChance, breakChance, LootProtect,
+				fakePunch, clickSimulation,noAir, damageTick, antiWeakness, particleChance);
 	}
-
 	@Override
 	public void onEnable() {
 		eventManager.add(TickListener.class, this);
@@ -71,113 +70,89 @@ public final class AutoCrystal extends Module implements TickListener, ItemUseLi
 		crystalling = false;
 		super.onEnable();
 	}
-
 	@Override
 	public void onDisable() {
 		eventManager.remove(TickListener.class, this);
 		eventManager.remove(ItemUseListener.class, this);
 		super.onDisable();
 	}
-
 	@Override
 	public void onTick() {
 		if (mc.currentScreen != null)
 			return;
-
 		boolean dontPlace = (placeClock != 0);
 		boolean dontBreak = (breakClock != 0);
-
 		if (LootProtect.getValue() &&
 				(WorldUtils.isDeadBodyNearby() || WorldUtils.isValuableLootNearby())) {
 			return;
 		}
-
+		if (noAir.getValue() && !mc.player.isOnGround()) {
+			return; // Skip all crystal actions while in air
+		}
 		int randomInt = MathUtils.randomInt(1, 100);
-
 		if (dontPlace)
 			placeClock--;
-
 		if (dontBreak)
 			breakClock--;
-
 		if (mc.player.isUsingItem())
 			return;
-
 		if (damageTick.getValue() && damageTickCheck())
 			return;
-
 		if (activateKey.getKey() != -1 && !KeyUtils.isKeyPressed(activateKey.getKey())) {
 			placeClock = 0;
 			breakClock = 0;
 			crystalling = false;
 			return;
 		} else crystalling = true;
-
 		if (mc.player.getMainHandStack().getItem() != Items.END_CRYSTAL)
 			return;
-
 		if (mc.crosshairTarget instanceof BlockHitResult hit) {
 			if (mc.crosshairTarget.getType() == HitResult.Type.BLOCK) {
 
 				if (!dontPlace && randomInt <= placeChance.getValueInt()) {
 					if (BlockUtils.isBlock(hit.getBlockPos(), Blocks.OBSIDIAN) || BlockUtils.isBlock(hit.getBlockPos(), Blocks.BEDROCK) && CrystalUtils.canPlaceCrystalClientAssumeObsidian(hit.getBlockPos())) {
-
 						if (clickSimulation.getValue())
 							MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
-
 						WorldUtils.placeBlock(hit, true);
-
 						if (fakePunch.getValue()) {
 							if (randomInt <= particleChance.getValue())
 								if (CrystalUtils.canPlaceCrystalClientAssumeObsidian(hit.getBlockPos()) && hit.getSide() == Direction.UP)
 									mc.player.swingHand(Hand.MAIN_HAND);
 						}
-
 						placeClock = placeDelay.getValueInt();
 					}
 				}
-
 				if (fakePunch.getValue()) {
 					if (!dontBreak && randomInt <= breakChance.getValueInt()) {
-
 						if (BlockUtils.isBlock(hit.getBlockPos(), Blocks.OBSIDIAN) || BlockUtils.isBlock(hit.getBlockPos(), Blocks.BEDROCK))
 							return;
-
 						if (clickSimulation.getValue()) {
 							if (BlockUtils.isBlock(hit.getBlockPos(), Blocks.OBSIDIAN) || BlockUtils.isBlock(hit.getBlockPos(), Blocks.BEDROCK)) {
 								if (CrystalUtils.canPlaceCrystalClientAssumeObsidian(hit.getBlockPos()))
 									MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_LEFT);
 							} else MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_LEFT);
 						}
-
 						mc.interactionManager.attackBlock(hit.getBlockPos(), hit.getSide());
 						mc.player.swingHand(Hand.MAIN_HAND);
 						mc.interactionManager.updateBlockBreakingProgress(hit.getBlockPos(), hit.getSide());
-
 						breakClock = breakDelay.getValueInt();
 					}
-
 					if (!dontPlace && randomInt <= placeChance.getValueInt() && dontBreak) {
 						if (clickSimulation.getValue())
 							MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
 					}
 				}
 			}
-
 			if (mc.crosshairTarget.getType() == HitResult.Type.MISS) {
 				if (fakePunch.getValue()) {
 					if (!dontBreak && randomInt <= breakChance.getValueInt()) {
 						if (mc.interactionManager.hasLimitedAttackSpeed())
 							mc.attackCooldown = 10;
-
 						if (clickSimulation.getValue())
 							MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-
 						mc.player.swingHand(Hand.MAIN_HAND);
-
 						breakClock = breakDelay.getValueInt();
 					}
-
 					if (!dontPlace && randomInt <= placeChance.getValueInt() && dontBreak) {
 						if (clickSimulation.getValue())
 							MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
@@ -185,25 +160,19 @@ public final class AutoCrystal extends Module implements TickListener, ItemUseLi
 				}
 			}
 		}
-
 		randomInt = MathUtils.randomInt(1, 100);
-
 		if (mc.crosshairTarget instanceof EntityHitResult hit) {
 			if (!dontBreak && randomInt <= breakChance.getValueInt()) {
 				Entity entity = hit.getEntity();
 
 				if (!fakePunch.getValue() && !(entity instanceof EndCrystalEntity || entity instanceof SlimeEntity))
 					return;
-
 				int previousSlot = mc.player.getInventory().getSelectedSlot();
-
 				if(entity instanceof EndCrystalEntity || entity instanceof SlimeEntity)
 					if(antiWeakness.getValue() && cantBreakCrystal())
 						InventoryUtils.selectSword();
-
 				if (clickSimulation.getValue())
 					MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-
 				WorldUtils.hitEntity(entity, true);
 				breakClock = breakDelay.getValueInt();
 
@@ -212,8 +181,6 @@ public final class AutoCrystal extends Module implements TickListener, ItemUseLi
 			}
 		}
 	}
-
-
 	@Override
 	public void onItemUse(ItemUseEvent event) {
 		if (mc.player.getMainHandStack().getItem() == Items.END_CRYSTAL) {
@@ -224,14 +191,12 @@ public final class AutoCrystal extends Module implements TickListener, ItemUseLi
 			}
 		}
 	}
-
 	private boolean cantBreakCrystal() {
-        assert mc.player != null;
-        StatusEffectInstance weakness = mc.player.getStatusEffect(StatusEffects.WEAKNESS);
+		assert mc.player != null;
+		StatusEffectInstance weakness = mc.player.getStatusEffect(StatusEffects.WEAKNESS);
 		StatusEffectInstance strength = mc.player.getStatusEffect(StatusEffects.STRENGTH);
 		return (!(weakness == null || strength != null && strength.getAmplifier() > weakness.getAmplifier() || WorldUtils.isTool(mc.player.getMainHandStack())));
 	}
-
 	private boolean damageTickCheck() {
 		return mc.world.getPlayers().parallelStream()
 				.filter(e -> e != mc.player)

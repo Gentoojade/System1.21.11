@@ -18,11 +18,9 @@ public final class NameProtect extends Module {
     public enum Mode {
         OFF, SELF, EVERYONE
     }
-
     private final ModeSetting<Mode> mode = new ModeSetting<>(EncryptedString.of("Mode"), Mode.SELF, Mode.class);
     private final StringSetting selfName = new StringSetting(EncryptedString.of("Your Name"), "You");
     private final StringSetting othersName = new StringSetting(EncryptedString.of("Others Name"), "Player");
-
     public NameProtect() {
         super(EncryptedString.of("NameProtect"),
                 EncryptedString.of("Hides player names in chat and nametags"),
@@ -30,7 +28,6 @@ public final class NameProtect extends Module {
                 Category.CLIENT);
         addSettings(mode, selfName, othersName);
     }
-
     public String replaceName(String string) {
         if (string == null || !isEnabled() || mode.getMode() == Mode.OFF) {
             return string;
@@ -67,7 +64,6 @@ public final class NameProtect extends Module {
                 return string;
         }
     }
-
     private String replaceNames(String input, String original, String replacement) {
         return input.replaceAll("\\b" + Pattern.quote(original) + "\\b", replacement);
     }

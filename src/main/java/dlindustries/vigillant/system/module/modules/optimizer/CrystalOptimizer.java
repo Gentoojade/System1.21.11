@@ -17,50 +17,40 @@ import net.minecraft.util.math.Vec3d;
 public final class CrystalOptimizer extends Module implements PacketSendListener {
 	public CrystalOptimizer() {
 		super(EncryptedString.of("Crystal Optimizer"),
-				EncryptedString.of("Marlowww based crystal optimizer - crystals faster"),
+				EncryptedString.of("Crystal optimizer - crystals faster, use if hit optimizer is enabled "),
 				-1,
 				Category.optimizer);
 	}
-
 	@Override
 	public void onEnable() {
 		eventManager.add(PacketSendListener.class, this);
 		super.onEnable();
 	}
-
 	@Override
 	public void onDisable() {
 		eventManager.remove(PacketSendListener.class, this);
 		super.onDisable();
 	}
-
 	@Override
 	public void onPacketSend(PacketSendEvent event) {
 		if (event.packet instanceof PlayerInteractEntityC2SPacket interactPacket) {
 			interactPacket.handle(new PlayerInteractEntityC2SPacket.Handler() {
 				@Override
 				public void interact(Hand hand) {
-
 				}
-
 				@Override
 				public void interactAt(Hand hand, Vec3d pos) {
-
 				}
-
 				@Override
 				public void attack() {
-
 					if (mc.crosshairTarget == null)
 						return;
-
 					if (mc.crosshairTarget.getType() == HitResult.Type.ENTITY && mc.crosshairTarget instanceof EntityHitResult hit) {
 						if (hit.getEntity() instanceof EndCrystalEntity) {
 							StatusEffectInstance weakness = mc.player.getStatusEffect(StatusEffects.WEAKNESS);
 							StatusEffectInstance strength = mc.player.getStatusEffect(StatusEffects.STRENGTH);
 							if (!(weakness == null || strength != null && strength.getAmplifier() > weakness.getAmplifier() || WorldUtils.isTool(mc.player.getMainHandStack())))
 								return;
-
 							hit.getEntity().discard();
 						}
 					}

@@ -1,7 +1,6 @@
 package dlindustries.vigillant.system;
 
 import net.fabricmc.api.ModInitializer;
-
 import java.io.IOException;
 
 public final class Main implements ModInitializer {

@@ -11,26 +11,21 @@ import net.minecraft.client.gui.screen.ingame.InventoryScreen;
 
 public final class DhandMod extends Module implements TickListener {
     private final NumberSetting slotSetting = new NumberSetting(EncryptedString.of("Totem Slot"), 1, 9, 9, 1);
-    private final NumberSetting delaySetting = new NumberSetting(EncryptedString.of("Open Delay"), 1, 100, 25, 1);
-
+    private final NumberSetting delaySetting = new NumberSetting(EncryptedString.of("Open Delay"), 1, 50, 25, 1);
     private boolean shouldOpenInventory = false;
     private int delayTicksRemaining = 0;
-
     public DhandMod() {
-        super(EncryptedString.of("D Hand Mod"), EncryptedString.of("Advanced version of D-hand-Mod - pair with autototem legit and general use."), -1, Category.CRYSTAL);
+        super(EncryptedString.of("Auto Dhand"), EncryptedString.of("Advanced version of D-hand-Mod - pair with autototem legit and general use."), -1, Category.CRYSTAL);
         addSettings(slotSetting, delaySetting);
     }
-
     @Override
     public void onEnable() {
         eventManager.add(TickListener.class, this);
     }
-
     @Override
     public void onDisable() {
         eventManager.remove(TickListener.class, this);
     }
-
     @Override
     public void onTick() {
         if (shouldOpenInventory && --delayTicksRemaining <= 0) {
@@ -38,16 +33,12 @@ public final class DhandMod extends Module implements TickListener {
             shouldOpenInventory = false;
         }
     }
-
     public static void handleInventoryKey() {
         DhandMod module = system.INSTANCE.getModuleManager().getModule(DhandMod.class);
         if (module == null || !module.isEnabled()) return;
-
         MinecraftClient client = MinecraftClient.getInstance();
         if (client.player == null || client.currentScreen != null) return;
-
         int totemSlot = module.slotSetting.getValueInt() - 1;
-
         if (client.player.getInventory().getSelectedSlot() == totemSlot) {
             client.setScreen(new InventoryScreen(client.player));
         } else {

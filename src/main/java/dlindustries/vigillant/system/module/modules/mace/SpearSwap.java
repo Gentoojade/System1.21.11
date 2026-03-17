@@ -6,31 +6,37 @@ import dlindustries.vigillant.system.module.Category;
 import dlindustries.vigillant.system.module.Module;
 import dlindustries.vigillant.system.module.setting.BooleanSetting;
 import dlindustries.vigillant.system.module.setting.NumberSetting;
+import dlindustries.vigillant.system.module.setting.KeybindSetting;
 import dlindustries.vigillant.system.utils.EncryptedString;
-import net.minecraft.entity.Entity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.tag.ItemTags;
-import net.minecraft.util.hit.EntityHitResult;
-import net.minecraft.util.hit.HitResult;
 
-public final class BreachSwap extends Module implements AttackListener, TickListener {
+public final class SpearSwap extends Module implements AttackListener, TickListener {
     private final BooleanSetting switchBack = new BooleanSetting(EncryptedString.of("Switch Back"), true)
-            .setDescription(EncryptedString.of("Switch back to sword after attack"));
-    private final NumberSetting switchDelay = new NumberSetting(EncryptedString.of("Switch Delay"), 0, 250, 50, 1)
-            .setDescription(EncryptedString.of("Delay in milliseconds for the macro"));
-    private final NumberSetting breachSlot = new NumberSetting(EncryptedString.of("Breach Slot"), 1, 9, 7, 1)
-            .setDescription(EncryptedString.of("Slot 1-9 for where you put your breach mace"));
-    private final BooleanSetting alwaysSwap = new BooleanSetting(EncryptedString.of("Always Swap"), false)
-            .setDescription(EncryptedString.of("Swaps even if it misses, looks more legit"));
+            .setDescription(EncryptedString.of("Switch back to previous slot after attack"));
+    private final NumberSetting switchDelay = new NumberSetting(
+            EncryptedString.of("Switch Delay"),
+            0, 250, 50, 1
+    ).setDescription(EncryptedString.of("Delay after attacking before switching back"));
+
+    private final NumberSetting breachSlot = new NumberSetting(EncryptedString.of("Spear's Slot"), 1, 9, 8, 1)
+            .setDescription(EncryptedString.of("Slot 1-9 for where you put your spear"));
+
+    private final BooleanSetting requireKey = new BooleanSetting(EncryptedString.of("Require Key"), true)
+            .setDescription(EncryptedString.of("Require holding the key to trigger spear swap"));
+
+    private final KeybindSetting activateKey = new KeybindSetting(
+            EncryptedString.of("Activate Key"),
+            -1,
+            false
+    );
     private boolean shouldSwitchBack;
     private int originalSlot = -1;
-    private long switchBackTime;
-    public BreachSwap() {
-        super(EncryptedString.of("Breach Swap"),
-                EncryptedString.of("Swaps to selected breach mace slot when attacking with sword"),
+    private int waitTicksRemaining;   // ticks left before switching back
+    public SpearSwap() {
+        super(EncryptedString.of("Spear Swap"),
+                EncryptedString.of("Swaps to selected spear after attacking"),
                 -1,
                 Category.mace);
-        addSettings(switchBack, switchDelay, breachSlot, alwaysSwap);
+        addSettings(switchBack, switchDelay, breachSlot, requireKey, activateKey);
     }
     @Override
     public void onEnable() {
@@ -50,17 +56,10 @@ public final class BreachSwap extends Module implements AttackListener, TickList
     }
     @Override
     public void onAttack(AttackEvent event) {
-        if (!alwaysSwap.getValue()) {
-            if (mc.crosshairTarget == null || mc.crosshairTarget.getType() != HitResult.Type.ENTITY) return;
-            Entity target = ((EntityHitResult) mc.crosshairTarget).getEntity();
-            if (target == null) return;
+        if (requireKey.getValue()) {
+            if (activateKey.getKey() == 0 || !activateKey.isPressed()) return;
         }
-        ItemStack currentStack = mc.player.getMainHandStack();
-        if (!currentStack.isIn(ItemTags.SWORDS)) return;
-        if (mc.player.fallDistance > 1.5f) return;
-
         if (shouldSwitchBack) {
-            switchBackTime = System.currentTimeMillis() + switchDelay.getValueInt();
             return;
         }
         int slotIndex = breachSlot.getValueInt() - 1;
@@ -70,19 +69,26 @@ public final class BreachSwap extends Module implements AttackListener, TickList
         mc.player.getInventory().setSelectedSlot(slotIndex);
         if (switchBack.getValue()) {
             shouldSwitchBack = true;
-            switchBackTime = System.currentTimeMillis() + switchDelay.getValueInt();
+            waitTicksRemaining = msToTicks(switchDelay.getValueInt());
         }
     }
     @Override
     public void onTick() {
         if (!shouldSwitchBack || originalSlot == -1) return;
-        if (System.currentTimeMillis() < switchBackTime) return;
+        if (waitTicksRemaining > 0) {
+            waitTicksRemaining--;
+            return;
+        }
         mc.player.getInventory().setSelectedSlot(originalSlot);
         resetState();
+    }
+    private int msToTicks(int ms) {
+        if (ms <= 0) return 0;
+        return (int) Math.ceil(ms / 50.0);
     }
     private void resetState() {
         shouldSwitchBack = false;
         originalSlot = -1;
-        switchBackTime = 0;
+        waitTicksRemaining = 0;
     }
 }

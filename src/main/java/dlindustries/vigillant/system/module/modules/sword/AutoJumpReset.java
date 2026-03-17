@@ -7,56 +7,99 @@ import dlindustries.vigillant.system.module.setting.BooleanSetting;
 import dlindustries.vigillant.system.module.setting.NumberSetting;
 import dlindustries.vigillant.system.utils.EncryptedString;
 import dlindustries.vigillant.system.utils.MathUtils;
-
+import org.lwjgl.glfw.GLFW;
 
 public final class AutoJumpReset extends Module implements TickListener {
-	private final NumberSetting chance = new NumberSetting(EncryptedString.of("Chance"), 0, 100, 100, 1);
-	private final BooleanSetting onHoldJump = new BooleanSetting(EncryptedString.of("On Hold Jump key only"), false);
+    private final NumberSetting chance = new NumberSetting(EncryptedString.of("Chance"), 0, 100, 100, 1);
+    private final BooleanSetting simulateKey = new BooleanSetting(EncryptedString.of("Simulate Key Press"), true);
+    private final BooleanSetting disableOnS = new BooleanSetting(EncryptedString.of("Disable on S press"), true);
+    private int lastHitTick = -1;
+    private int scheduledJumpTick = -1;
+    private boolean isSimulatingKey = false;
+    private int keyHoldTicks = 0;
+    private int lastHurtTime = 0;
+    public AutoJumpReset() {
+        super(EncryptedString.of("Jump Reset"),
+                EncryptedString.of("Human-like jump reset"),
+                -1,
+                Category.sword);
+        addSettings(chance, simulateKey, disableOnS);
+    }
+    @Override
+    public void onEnable() {
+        eventManager.add(TickListener.class, this);
+        resetState();
+        super.onEnable();
+    }
+    @Override
+    public void onDisable() {
+        eventManager.remove(TickListener.class, this);
+        releaseJumpKey();
+        super.onDisable();
+    }
+    private void resetState() {
+        lastHitTick = -1;
+        scheduledJumpTick = -1;
+        isSimulatingKey = false;
+        keyHoldTicks = 0;
+        lastHurtTime = 0;
+        releaseJumpKey();
+    }
+    private void releaseJumpKey() {
+        if (mc.options == null) return;
+        mc.options.jumpKey.setPressed(false);
+    }
+    private boolean isPressingS() {
+        if (mc.getWindow() == null) return false;
+        long windowHandle = mc.getWindow().getHandle();
+        return GLFW.glfwGetKey(windowHandle, GLFW.GLFW_KEY_S) == GLFW.GLFW_PRESS;
+    }
+    @Override
+    public void onTick() {
+        if (mc.player == null || mc.world == null) return;
+        if (isSimulatingKey) {
+            if (--keyHoldTicks <= 0) {
+                releaseJumpKey();
+                isSimulatingKey = false;
+            }
+        }
+        if (scheduledJumpTick != -1 && (mc.player.isDead() || mc.currentScreen != null)) {
+            scheduledJumpTick = -1;
+        }
+        int currentHurtTime = mc.player.hurtTime;
+        if (currentHurtTime > lastHurtTime && currentHurtTime == mc.player.maxHurtTime) {
+            lastHitTick = mc.player.age;
+            scheduledJumpTick = -1;
 
-	public AutoJumpReset() {
-		super(EncryptedString.of("Jump Reset"),
-				EncryptedString.of("Sword pvp technique to take less knockback - Do not enable for Crystal pvp"),
-				-1,
-				Category.sword);
-		addSettings(chance, onHoldJump);
-	}
-
-	@Override
-	public void onEnable() {
-		eventManager.add(TickListener.class, this);
-		super.onEnable();
-	}
-
-	@Override
-	public void onDisable() {
-		eventManager.remove(TickListener.class, this);
-		super.onDisable();
-	}
-
-	@Override
-	public void onTick() {
-		if (onHoldJump.getValue() && !mc.options.jumpKey.isPressed()) {
-			return;
-		}
-
-		if(MathUtils.randomInt(1, 100) <= chance.getValueInt()) {
-			if (mc.currentScreen != null)
-				return;
-
-			if (mc.player.isUsingItem())
-				return;
-
-			if (mc.player.hurtTime == 0)
-				return;
-
-			if (mc.player.hurtTime == mc.player.maxHurtTime)
-				return;
-
-			if (!mc.player.isOnGround())
-				return;
-
-			if (mc.player.hurtTime == 9 && MathUtils.randomInt(1, 100) <= chance.getValueInt())
-				mc.player.jump();
-		}
-	}
+            if (mc.player.isOnGround()
+                    && MathUtils.randomInt(1, 100) <= chance.getValueInt()
+                    && (!disableOnS.getValue() || !isPressingS())) {
+                int delay = MathUtils.randomInt(2, 3);
+                scheduledJumpTick = lastHitTick + delay;
+            }
+        }
+        lastHurtTime = currentHurtTime;
+        if (scheduledJumpTick != -1 && mc.player.age >= scheduledJumpTick) {
+            if (mc.currentScreen == null
+                    && !mc.player.isUsingItem()
+                    && mc.player.isOnGround()
+                    && mc.player.hurtTime > 0
+                    && (!disableOnS.getValue() || !isPressingS())) {
+                if (simulateKey.getValue()) {
+                    if (!isSimulatingKey) {
+                        mc.options.jumpKey.setPressed(true);
+                        isSimulatingKey = true;
+                        keyHoldTicks = MathUtils.randomInt(1, 2);
+                    }
+                } else {
+                    mc.player.jump();
+                }
+            }
+            scheduledJumpTick = -1;
+        }
+        if (isSimulatingKey && (mc.player == null || mc.world == null)) {
+            releaseJumpKey();
+            isSimulatingKey = false;
+        }
+    }
 }

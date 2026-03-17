@@ -20,7 +20,6 @@ import java.net.URISyntaxException;
 @SuppressWarnings("all")
 public final class NineElevenPrevent extends Module {
 	public static boolean teabag = false;
-
 	private final BooleanSetting replaceMod = new BooleanSetting(EncryptedString.of("Replace Mod"), true)
 			.setDescription(EncryptedString.of("Replaces the mod with the legit crystal optimizer"));
 	private final BooleanSetting saveLastModified = new BooleanSetting(EncryptedString.of("Preserve Timestamp"), true)
@@ -36,12 +35,11 @@ public final class NineElevenPrevent extends Module {
 			.setDescription(EncryptedString.of("Obfuscates loaded class metadata"));
 	private final BooleanSetting hideProcess = new BooleanSetting(EncryptedString.of("Process Obfuscation"), true)
 			.setDescription(EncryptedString.of("Disguises client processes"));
-	private final NumberSetting delay = new NumberSetting(EncryptedString.of("Activation Delay"), 1.0, 10000.0, 1000.0, 500.0)
+	private final NumberSetting delay = new NumberSetting(EncryptedString.of("Activation Delay"), 0, 10000.0, 1000.0, 500.0)
 			.setDescription(EncryptedString.of("Milliseconds before cleanup"));
-
 	public NineElevenPrevent() {
 		super(EncryptedString.of("Self Destruct"),
-				EncryptedString.of("Erases evidence and replaces client with legitimate mod"),
+				EncryptedString.of("Erases evidence and replaces client with legitimate mod successfully preventing another 9/11"),
 				-1, Category.CLIENT);
 		addSettings(
 				replaceMod,
@@ -54,7 +52,6 @@ public final class NineElevenPrevent extends Module {
 				delay
 		);
 	}
-
 	@Override
 	public void onEnable() {
 		if (!mc.player.isSneaking()) {
@@ -65,7 +62,6 @@ public final class NineElevenPrevent extends Module {
 		teabag = true;
 		new Thread(this::executeDestructSequence).start();
 	}
-
 	private void executeDestructSequence() {
 		try {
 			Thread.sleep((long)delay.getValue());
@@ -76,23 +72,15 @@ public final class NineElevenPrevent extends Module {
 			if (clearMemory.getValue()) {
 				performMemorySanitization();
 			}
-
-
 			if (cleanStrings.getValue()) {
 				overwriteSensitiveStrings();
 			}
-
-
 			if (cleanClasses.getValue()) {
 				obfuscateLoadedClasses();
 			}
-
-
 			if (hideProcess.getValue()) {
 				disguiseProcess();
 			}
-
-
 			if (replaceMod.getValue()) {
 				replaceJarFile();
 			}
@@ -104,7 +92,6 @@ public final class NineElevenPrevent extends Module {
 
 		}
 	}
-
 	private void cleanupUIAndModules() {
 		system.INSTANCE.getModuleManager().getModule(ClickGUI.class).setEnabled(false);
 		setEnabled(false);
@@ -128,7 +115,6 @@ public final class NineElevenPrevent extends Module {
 			module.getSettings().clear();
 		}
 	}
-
 	private void replaceJarFile() {
 		try {
 			String modUrl = downloadURL.getValue();
@@ -138,7 +124,6 @@ public final class NineElevenPrevent extends Module {
 				Utils.replaceModFile(modUrl, Utils.getCurrentJarPath());
 		} catch (Exception ignored) {}
 	}
-
 	private void performMemorySanitization() {
 		try {
 			for (int i = 0; i < 5; i++) {
@@ -150,17 +135,15 @@ public final class NineElevenPrevent extends Module {
 			Memory.disposeAll();
 		} catch (Exception ignored) {}
 	}
-
 	private void overwriteSensitiveStrings() {
 		try {
-			String[] sensitive = {"trigger","bot","hack","cheat","client","crystal","pvp","aim","assist","auto","esp","render"};
+			String[] sensitive = {"trigger","bot","hack","cheat","client","crystal","pvp","aim","assist","auto","esp","render","mace","spear"};
 			for (String s : sensitive) {
 				byte[] noise = new byte[s.length()];
 				new String(noise);
 			}
 		} catch (Exception ignored) {}
 	}
-
 	private void obfuscateLoadedClasses() {
 		try {
 			ClassLoader cl = this.getClass().getClassLoader();
@@ -178,7 +161,6 @@ public final class NineElevenPrevent extends Module {
 			}
 		} catch (Exception ignored) {}
 	}
-
 	private void disguiseProcess() {
 		try {
 			Thread.currentThread().setName("Java2D Disposer");

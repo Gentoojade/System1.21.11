@@ -10,44 +10,37 @@ import net.minecraft.item.BlockItem;
 import net.minecraft.block.Blocks;
 
 public final class Sprint extends Module implements TickListener {
-    private final BooleanSetting noSprintOnAnchor = new BooleanSetting(EncryptedString.of("No Sprint on Anchor"), false);
-    private final BooleanSetting noSprintOnObsidian = new BooleanSetting(EncryptedString.of("No Sprint on Obsidian"), false);
+    private final BooleanSetting noSprintOnAnchor = new BooleanSetting(EncryptedString.of("No Sprint on Anchor"), true);
+    private final BooleanSetting noSprintOnObsidian = new BooleanSetting(EncryptedString.of("No Sprint on Obsidian"), true);
     public Sprint() {
         super(
                 EncryptedString.of("Sprint Optimizer"),
-                EncryptedString.of("optimization for d-taps/sprinting ect - bypasses all anticheats."),
+                EncryptedString.of("Sprints automatically, useful for d-taps and w-taps"),
                 -1,
                 Category.optimizer
         );
         addSettings(noSprintOnAnchor, noSprintOnObsidian);
     }
-
     @Override
     public void onEnable() {
         eventManager.add(TickListener.class, this);
         super.onEnable();
     }
-
     @Override
     public void onDisable() {
         eventManager.remove(TickListener.class, this);
         super.onDisable();
     }
-
     @Override
     public void onTick() {
         assert mc.player != null;
-
         boolean shouldSprint = true;
-
         if (noSprintOnObsidian.getValue() && mc.player.getMainHandStack().isOf(Items.OBSIDIAN)) {
             shouldSprint = false;
         }
-
         if (noSprintOnAnchor.getValue() && mc.player.getMainHandStack().isOf(Items.RESPAWN_ANCHOR)) {
             shouldSprint = false;
         }
-
         if (shouldSprint) {
             mc.player.setSprinting(mc.player.input.hasForwardMovement());
         } else {

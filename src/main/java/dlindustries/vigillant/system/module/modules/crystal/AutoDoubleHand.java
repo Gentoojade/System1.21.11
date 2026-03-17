@@ -107,8 +107,6 @@ public final class AutoDoubleHand extends Module implements HudListener {
 		eventManager.remove(HudListener.class, this);
 		super.onDisable();
 	}
-
-	@SuppressWarnings("all")
 	@Override
 	public void onRenderHud(HudEvent event) {
 		if (mc.player == null) return;
@@ -119,7 +117,6 @@ public final class AutoDoubleHand extends Module implements HudListener {
 				return;
 			}
 		}
-
 		double squaredDistance = distance.getValue() * distance.getValue();
 		PlayerInventory inventory = mc.player.getInventory();
 
@@ -129,14 +126,12 @@ public final class AutoDoubleHand extends Module implements HudListener {
 			int totemSlot = findItemInHotbar(Items.TOTEM_OF_UNDYING);
 			safeSelectSlot(totemSlot);
 		}
-
-        if (mc.player.getOffHandStack().getItem() == Items.TOTEM_OF_UNDYING) offhandHasNoTotem = false;
+		if (mc.player.getOffHandStack().getItem() == Items.TOTEM_OF_UNDYING) offhandHasNoTotem = false;
 		if (mc.player.getHealth() <= health.getValue() && onHealth.getValue() && !belowHealth) {
 			belowHealth = true;
 			int totemSlot = findItemInHotbar(Items.TOTEM_OF_UNDYING);
 			safeSelectSlot(totemSlot);
 		}
-
 		if (mc.player.getHealth() > health.getValue()) belowHealth = false;
 		if (!predict.getValue()) return;
 		if (includeAnchor.getValue()) {
@@ -148,7 +143,6 @@ public final class AutoDoubleHand extends Module implements HudListener {
 						return state.getBlock() == Blocks.RESPAWN_ANCHOR && state.get(RespawnAnchorBlock.CHARGES) > 0;
 					})
 					.toList();
-
 			for (BlockPos anchorPos : chargedAnchors) {
 				Vec3d anchorVec = Vec3d.ofCenter(anchorPos);
 				float damage = DamageUtils.anchorDamage(mc.player, anchorVec);
@@ -196,7 +190,6 @@ public final class AutoDoubleHand extends Module implements HudListener {
 			Stream<BlockPos> s = BlockUtils.getAllInBoxStream(mc.player.getBlockPos().add(-6, -8, -6), mc.player.getBlockPos().add(6, 2, 6))
 					.filter(e -> mc.world.getBlockState(e).getBlock() == Blocks.OBSIDIAN || mc.world.getBlockState(e).getBlock() == Blocks.BEDROCK)
 					.filter(CrystalUtils::canPlaceCrystalClient);
-
 			if (checkAim.getValue()) {
 				if (checkItems.getValue())
 					s = s.filter(this::arePeopleAimingAtBlockAndHoldingCrystals);
@@ -216,8 +209,6 @@ public final class AutoDoubleHand extends Module implements HudListener {
 			}
 		}
 	}
-
-
 	private int findItemInHotbar(net.minecraft.item.Item item) {
 		if (mc.player == null) return -1;
 		for (int i = 0; i < 9; i++) {
@@ -225,30 +216,23 @@ public final class AutoDoubleHand extends Module implements HudListener {
 		}
 		return -1;
 	}
-
-
 	private void safeSelectSlot(int slot) {
 		if (mc.player == null) return;
 		if (slot >= 0 && slot <= 8) {
 			mc.player.getInventory().setSelectedSlot(slot);
 		}
 	}
-
 	private boolean isElytraEquipped() {
         return mc.player.getEquippedStack(EquipmentSlot.CHEST).getItem() == Items.ELYTRA;
 	}
-
 	private boolean hasTotemInOffhand() {
         return mc.player.getOffHandStack().getItem() == Items.TOTEM_OF_UNDYING;
 	}
-
 	private List<EndCrystalEntity> nearbyCrystals() {
 		Vec3d pos = new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ());
 		return mc.world.getEntitiesByClass(EndCrystalEntity.class, new Box(pos.add(-6.0, -6.0, -6.0), pos.add(6.0, 6.0, 6.0)), e -> true);
 	}
-
-	private boolean arePeopleAimingAtBlock(final BlockPos block) {
-		final Vec3d[] eyesPos = new Vec3d[1];
+	private boolean arePeopleAimingAtBlock(final BlockPos block) {final Vec3d[] eyesPos = new Vec3d[1];
 		final BlockHitResult[] hitResult = new BlockHitResult[1];
 
 		return mc.world.getPlayers().parallelStream().filter(e -> e != mc.player).anyMatch(e -> {
@@ -257,7 +241,6 @@ public final class AutoDoubleHand extends Module implements HudListener {
 			return hitResult[0] != null && hitResult[0].getBlockPos().equals(block);
 		});
 	}
-
 	private boolean arePeopleAimingAtBlockAndHoldingCrystals(final BlockPos block) {
 		final Vec3d[] eyesPos = new Vec3d[1];
 		final BlockHitResult[] hitResult = new BlockHitResult[1];

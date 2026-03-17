@@ -31,34 +31,31 @@ import net.minecraft.world.debug.gizmo.GizmoDrawing;
 import java.awt.*;
 
 public final class StorageEsp extends Module implements PacketReceiveListener {
-    private final BooleanSetting donutBypass = new BooleanSetting("Possible Bypass", false)
+    private final BooleanSetting donutBypass = new BooleanSetting("Bypass?", true)
             .setDescription("Cancels chunk delta packets used by anti-ESP checks");
-    private final NumberSetting range = new NumberSetting("Range", 8, 256, 96, 1)
+    private final NumberSetting range = new NumberSetting("Range", 8, 256, 256, 1)
             .setDescription("Maximum render distance");
-    private final NumberSetting fillAlpha = new NumberSetting("Fill Alpha", 0, 255, 70, 1)
+    private final NumberSetting fillAlpha = new NumberSetting("Fill Alpha", 0, 255, 80, 1)
             .setDescription("Fill opacity");
     private final NumberSetting outlineAlpha = new NumberSetting("Outline Alpha", 0, 255, 220, 1)
             .setDescription("Outline opacity");
     private final BooleanSetting solid = new BooleanSetting("Solid", true)
             .setDescription("Draw filled boxes");
-
     private final BooleanSetting chests = new BooleanSetting("Chests", true);
     private final BooleanSetting trappedChests = new BooleanSetting("Trapped Chests", true);
-    private final BooleanSetting enderChests = new BooleanSetting("Ender Chests", true);
+    private final BooleanSetting enderChests = new BooleanSetting("Ender Chests", false);
     private final BooleanSetting shulkers = new BooleanSetting("Shulkers", true);
     private final BooleanSetting barrels = new BooleanSetting("Barrels", true);
     private final BooleanSetting furnaces = new BooleanSetting("Furnaces", false);
     private final BooleanSetting enchantTables = new BooleanSetting("Enchant Tables", false);
-    private final BooleanSetting spawners = new BooleanSetting("Spawners", false);
-
+    private final BooleanSetting spawners = new BooleanSetting("Spawners", true);
     private boolean worldRenderHookRegistered;
 
     public StorageEsp() {
         super(EncryptedString.of("Storage ESP"),
-                EncryptedString.of("Renders storage blocks through walls"),
+                EncryptedString.of("Renders block entities through walls"),
                 -1,
-                Category.RENDER);
-
+                Category.ESP);
         addSettings(
                 donutBypass,
                 range,
@@ -74,26 +71,21 @@ public final class StorageEsp extends Module implements PacketReceiveListener {
                 enchantTables,
                 spawners
         );
-
         registerWorldRenderHook();
     }
-
     @Override
     public void onEnable() {
         eventManager.add(PacketReceiveListener.class, this);
     }
-
     @Override
     public void onDisable() {
         eventManager.remove(PacketReceiveListener.class, this);
     }
-
     private void registerWorldRenderHook() {
         if (worldRenderHookRegistered) return;
         worldRenderHookRegistered = true;
         WorldRenderEvents.BEFORE_DEBUG_RENDER.register(this::onWorldRender);
     }
-
     private void onWorldRender(WorldRenderContext context) {
         if (!isEnabled() || mc.world == null || mc.player == null) return;
         WorldRenderer worldRenderer = context.worldRenderer();
@@ -135,7 +127,6 @@ public final class StorageEsp extends Module implements PacketReceiveListener {
             }
         }
     }
-
     private StorageStyle getStyle(BlockEntity blockEntity) {
         if (blockEntity == null) return null;
 
@@ -166,18 +157,15 @@ public final class StorageEsp extends Module implements PacketReceiveListener {
 
         return null;
     }
-
     private static Color withAlpha(Color base, int alpha) {
         return new Color(base.getRed(), base.getGreen(), base.getBlue(), alpha);
     }
-
     @Override
     public void onPacketReceive(PacketReceiveListener.PacketReceiveEvent event) {
         if (donutBypass.getValue() && event.packet instanceof ChunkDeltaUpdateS2CPacket) {
             event.cancel();
         }
     }
-
     private record StorageStyle(Color color) {
     }
 }

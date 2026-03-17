@@ -7,7 +7,7 @@ import dlindustries.vigillant.system.utils.EncryptedString;
 public final class NoBreakDelay extends Module {
 	public NoBreakDelay() {
 		super(EncryptedString.of("Break optimizer"),
-				EncryptedString.of("ignores block break delay for diggers"),
+				EncryptedString.of("ignores block break delay, detected by AC"),
 				-1,
 				Category.optimizer);
 	}

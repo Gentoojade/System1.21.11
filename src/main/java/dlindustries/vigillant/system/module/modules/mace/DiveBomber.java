@@ -13,42 +13,37 @@ import net.minecraft.item.Items;
 import net.minecraft.util.Hand;
 
 public class DiveBomber extends Module implements TickListener, AttackListener {
-
-    private final NumberSetting switchDelay = new NumberSetting(EncryptedString.of("Switch Delay"), 0, 20, 1, 1);
-    private final NumberSetting chestplateSlot = new NumberSetting(EncryptedString.of("Chestplate Slot"), 1, 9, 2, 1)
-            .setDescription(EncryptedString.of("Slot 1-9 for chestplate"));
-    private final NumberSetting maceSlot = new NumberSetting(EncryptedString.of("Mace Slot"), 1, 9, 1, 1)
-            .setDescription(EncryptedString.of("Slot 1-9 for mace"));
-
+    private final NumberSetting switchDelay = new NumberSetting(EncryptedString.of("Switch Delay"), 0, 250, 50, 1)
+            .setDescription(EncryptedString.of("Delay in milliseconds"));
+    private final NumberSetting chestplateSlot = new NumberSetting(EncryptedString.of("Chestplate Slot"), 1, 9, 5, 1)
+            .setDescription(EncryptedString.of("Slot 1-9 for where you put your chestplate"));
+    private final NumberSetting maceSlot = new NumberSetting(EncryptedString.of("Mace Slot"), 1, 9, 8, 1)
+            .setDescription(EncryptedString.of("Slot 1-9 for where you put your wind burst mace"));
     private enum EquipState {
         IDLE,
         SWITCHING_TO_CHESTPLATE,
         EQUIPPING,
         SWITCHING_BACK
     }
-
     private EquipState equipState = EquipState.IDLE;
-    private int equipTimer = 0;
+    private long nextStepTime = 0; // time in ms when the next step should execute
     private boolean isElytraEquipped = false;
     private long groundTime = 0;
-
     public DiveBomber() {
         super(
                 EncryptedString.of("DiveBomber"),
-                EncryptedString.of("Auto chestplate swap when you left click while flying to deal alot more damage with mace"),
+                EncryptedString.of("Makes elytra mace easier, aim and click"),
                 -1,
                 Category.mace
         );
         addSettings(switchDelay, chestplateSlot, maceSlot);
     }
-
     @Override
     public void onEnable() {
         eventManager.add(TickListener.class, this);
         eventManager.add(AttackListener.class, this);
         super.onEnable();
     }
-
     @Override
     public void onDisable() {
         eventManager.remove(TickListener.class, this);
@@ -56,17 +51,14 @@ public class DiveBomber extends Module implements TickListener, AttackListener {
         resetState();
         super.onDisable();
     }
-
     @Override
     public void onTick() {
-
         if (mc.currentScreen != null) return;
         if (mc.player == null) return;
         ItemStack chestItem = mc.player.getEquippedStack(EquipmentSlot.CHEST);
         isElytraEquipped = chestItem.getItem() == Items.ELYTRA;
         if (equipState != EquipState.IDLE) {
-            if (++equipTimer >= switchDelay.getValueInt()) {
-                equipTimer = 0;
+            if (System.currentTimeMillis() >= nextStepTime) {
                 processEquipState();
             }
         }
@@ -81,56 +73,51 @@ public class DiveBomber extends Module implements TickListener, AttackListener {
             groundTime = 0;
         }
     }
-
     @Override
     public void onAttack(AttackEvent event) {
-
         if (mc.currentScreen != null) return;
         if (mc.player == null || !isElytraEquipped) return;
 
         startEquipProcess();
     }
-
     private void startEquipProcess() {
         if (equipState == EquipState.IDLE) {
             equipState = EquipState.SWITCHING_TO_CHESTPLATE;
-            processEquipState(); // Start immediately
+            processEquipState();
         }
     }
-
     private void processEquipState() {
-
         if (mc.currentScreen != null) {
             resetState();
             return;
         }
-
         PlayerEntity player = mc.player;
         if (player == null) {
             resetState();
             return;
         }
-
         switch (equipState) {
             case SWITCHING_TO_CHESTPLATE:
                 player.getInventory().setSelectedSlot(chestplateSlot.getValueInt() - 1);
                 equipState = EquipState.EQUIPPING;
+                nextStepTime = System.currentTimeMillis() + switchDelay.getValueInt();
                 break;
-
-            case EQUIPPING:
+                case EQUIPPING:
                 mc.interactionManager.interactItem(player, Hand.MAIN_HAND);
                 equipState = EquipState.SWITCHING_BACK;
+                nextStepTime = System.currentTimeMillis() + switchDelay.getValueInt();
                 break;
-
-            case SWITCHING_BACK:
+                case SWITCHING_BACK:
                 player.getInventory().setSelectedSlot(maceSlot.getValueInt() - 1);
+                resetState();
+                break;
+                default:
                 resetState();
                 break;
         }
     }
-
     private void resetState() {
         equipState = EquipState.IDLE;
-        equipTimer = 0;
+        nextStepTime = 0;
     }
 }

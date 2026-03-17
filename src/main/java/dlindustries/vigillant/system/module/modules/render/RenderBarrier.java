@@ -7,7 +7,7 @@ import dlindustries.vigillant.system.utils.EncryptedString;
 public final class RenderBarrier extends Module {
     public RenderBarrier() {
         super(EncryptedString.of("Render Barrier"),
-                EncryptedString.of("Renders invisible barriers"),
+                EncryptedString.of("Renders barrier blocks"),
                 -1,
                 Category.RENDER);
     }

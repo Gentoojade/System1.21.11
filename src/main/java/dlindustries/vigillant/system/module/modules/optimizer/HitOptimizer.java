@@ -14,27 +14,22 @@ import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.hit.HitResult;
 
 public final class HitOptimizer extends Module implements AttackListener, TickListener {
-
     private final BooleanSetting requireSword = new BooleanSetting(EncryptedString.of("Require Sword"), true)
             .setDescription(EncryptedString.of("Only switch if sword is available"));
-
     private final BooleanSetting switchBack = new BooleanSetting(EncryptedString.of("Switch Back"), true)
             .setDescription(EncryptedString.of("Switch back to original slot after attack"));
-
     private final NumberSetting switchDelay = new NumberSetting(EncryptedString.of("Switch Delay"), 0, 5, 1, 1)
             .setDescription(EncryptedString.of("Delay after attacking before switching back"));
     private boolean shouldSwitchBack;
     private int originalSlot = -1;
     private int switchTimer;
-
     public HitOptimizer() {
         super(EncryptedString.of("Hit Optimizer"),
-                EncryptedString.of("Automatically switches to sword for attacks / make sure they take KB"),
+                EncryptedString.of("Automatically switches to sword for attacks to make sure they take KB"),
                 -1,
                 Category.optimizer);
         addSettings(requireSword, switchBack, switchDelay);
     }
-
     @Override
     public void onEnable() {
         eventManager.add(AttackListener.class, this);
@@ -42,7 +37,6 @@ public final class HitOptimizer extends Module implements AttackListener, TickLi
         resetState();
         super.onEnable();
     }
-
     @Override
     public void onDisable() {
         eventManager.remove(AttackListener.class, this);
@@ -52,7 +46,6 @@ public final class HitOptimizer extends Module implements AttackListener, TickLi
         }
         super.onDisable();
     }
-
     @Override
     public void onAttack(AttackEvent event) {
         if (mc.player == null) return;
@@ -90,7 +83,6 @@ public final class HitOptimizer extends Module implements AttackListener, TickLi
             }
         }
     }
-
     @Override
     public void onTick() {
         if (mc.player == null) {
@@ -108,13 +100,11 @@ public final class HitOptimizer extends Module implements AttackListener, TickLi
         mc.player.getInventory().setSelectedSlot(originalSlot);
         resetState();
     }
-
     private void resetState() {
         shouldSwitchBack = false;
         originalSlot = -1;
         switchTimer = 0;
     }
-
     private boolean isWeapon(ItemStack stack) {
         Item item = stack.getItem();
         return stack.isIn(ItemTags.SWORDS) ||
@@ -128,7 +118,6 @@ public final class HitOptimizer extends Module implements AttackListener, TickLi
                 item == Items.DIAMOND_CHESTPLATE ||
                 item == Items.NETHERITE_CHESTPLATE;
     }
-
     private int findSwordSlot() {
         for (int slot = 0; slot < 9; slot++) {
             ItemStack stack = mc.player.getInventory().getStack(slot);

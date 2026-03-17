@@ -14,52 +14,49 @@ public final class CameraOptimizer extends Module implements CameraUpdateListene
             -1,
             false
     );
-
     private final BooleanSetting noClip = new BooleanSetting(
             EncryptedString.of("No Clip"),
             true
     ).setDescription(EncryptedString.of("Allows camera to pass through blocks"));
-
     private final BooleanSetting noOverlay = new BooleanSetting(
             EncryptedString.of("No Overlay"),
             true
-    ).setDescription(EncryptedString.of("Removes water/lava visual effects"));
-
+    ).setDescription(EncryptedString.of("Removes water and lava visual effects"));
+    private final BooleanSetting alwaysOn = new BooleanSetting(
+            EncryptedString.of("Always On"),
+            true
+    ).setDescription(EncryptedString.of("If enabled, effects are active whenever the module is on"));
     public CameraOptimizer() {
         super(
                 EncryptedString.of("Camera Optimizer"),
-                EncryptedString.of("Improves camera behavior and removes restrictions - Pair with Freelook Mod"),
+                EncryptedString.of("Improves camera behavior and removes restrictions Pairs well with the Freelook Mod"),
                 -1,
                 Category.RENDER
         );
-        addSettings(toggleKey, noClip, noOverlay);
+        addSettings(toggleKey, noClip, noOverlay, alwaysOn);
     }
-
     @Override
     public void onEnable() {
         eventManager.add(CameraUpdateListener.class, this);
         super.onEnable();
     }
-
     @Override
     public void onDisable() {
         eventManager.remove(CameraUpdateListener.class, this);
         super.onDisable();
     }
-
     @Override
     public void onCameraUpdate(CameraUpdateEvent event) {
     }
-
     public boolean isToggleKeyPressed() {
         return toggleKey.getKey() != -1 && KeyUtils.isKeyPressed(toggleKey.getKey());
     }
-
     public boolean isNoClipEnabled() {
-        return isEnabled() && noClip.getValue() && isToggleKeyPressed();
+        if (!isEnabled() || !noClip.getValue()) return false;
+        return alwaysOn.getValue() || isToggleKeyPressed();
     }
-
     public boolean isNoOverlayEnabled() {
-        return isEnabled() && noOverlay.getValue() && isToggleKeyPressed();
+        if (!isEnabled() || !noOverlay.getValue()) return false;
+        return alwaysOn.getValue() || isToggleKeyPressed();
     }
 }

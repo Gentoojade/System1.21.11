@@ -29,7 +29,6 @@ public final class TargetHud extends Module implements HudListener, PacketSendLi
 	private static final int PANEL_WIDTH = 340;
 	private static final int PANEL_HEIGHT = 200;
 	private static final int BORDER_RADIUS = 8;
-
 	private long lastAttackTime = 0;
 	public static float animation;
 	private static final long timeout = 10000;
@@ -41,28 +40,29 @@ public final class TargetHud extends Module implements HudListener, PacketSendLi
 				Category.RENDER);
 		addSettings(xCoord, yCoord, hudTimeout);
 	}
-
 	@Override
 	public void onEnable() {
 		eventManager.add(HudListener.class, this);
 		eventManager.add(PacketSendListener.class, this);
 		super.onEnable();
 	}
-
 	@Override
 	public void onDisable() {
 		eventManager.remove(HudListener.class, this);
 		eventManager.remove(PacketSendListener.class, this);
 		super.onDisable();
 	}
-
 	@Override
 	public void onRenderHud(HudEvent event) {
 		DrawContext context = event.context;
 		int x = xCoord.getValueInt();
 		int y = yCoord.getValueInt();
+		float scaleFactor = (float) mc.getWindow().getScaleFactor();
+		float invScale = 1.0f / scaleFactor;
 
-		RenderUtils.unscaledProjection();
+		context.getMatrices().pushMatrix();
+		context.getMatrices().scale(invScale, invScale);
+
 		if ((!hudTimeout.getValue() || (System.currentTimeMillis() - lastAttackTime <= timeout)) &&
 				mc.player.getAttacking() != null && mc.player.getAttacking() instanceof PlayerEntity player && player.isAlive()) {
 			animation = RenderUtils.fast(animation, player.isAlive() ? 0 : 1, 15f);
@@ -70,46 +70,38 @@ public final class TargetHud extends Module implements HudListener, PacketSendLi
 			PlayerListEntry entry = mc.getNetworkHandler().getPlayerListEntry(player.getUuid());
 			Color themeColor = Utils.getMainColor(255, 0);
 			Color glowColor = new Color(themeColor.getRed(), themeColor.getGreen(), themeColor.getBlue(), 100);
-
-			// Ensure a guaranteed visible background even if rounded-quad pipeline fails on some render paths.
 			context.fill(x, y, x + PANEL_WIDTH, y + PANEL_HEIGHT, PANEL_COLOR.getRGB());
 			RenderUtils.renderRoundedQuad(context.getMatrices(), PANEL_COLOR, x, y, x + PANEL_WIDTH, y + PANEL_HEIGHT, BORDER_RADIUS, BORDER_RADIUS, BORDER_RADIUS, BORDER_RADIUS, 10);
-
 			for (int i = 0; i < 3; i++) {
 				RenderUtils.renderRoundedOutline(context, glowColor,
 						x - i, y - i, x + PANEL_WIDTH + i, y + PANEL_HEIGHT + i,
 						BORDER_RADIUS, BORDER_RADIUS, BORDER_RADIUS, BORDER_RADIUS, 1, 10);
 			}
-
 			RenderUtils.renderRoundedOutline(context, themeColor,
 					x, y, x + PANEL_WIDTH, y + PANEL_HEIGHT,
 					BORDER_RADIUS, BORDER_RADIUS, BORDER_RADIUS, BORDER_RADIUS, 1, 10);
 			RenderUtils.renderRoundedQuad(context.getMatrices(), themeColor,
 					x, y + 27, x + PANEL_WIDTH, y + 29,
 					0, 0, 0, 0, 10);
+
 			dlindustries.vigillant.system.module.modules.client.NameProtect nameProtect =
 					dlindustries.vigillant.system.system.INSTANCE.getModuleManager().getModule(
 							dlindustries.vigillant.system.module.modules.client.NameProtect.class);
 			String displayName = player.getName().getString();
 			if (nameProtect != null) displayName = nameProtect.replaceName(displayName);
-
 			TextRenderer.drawString(displayName + " §8| §b" + MathUtils.roundToDecimal(player.distanceTo(mc.player), 0.5) + " blocks", context, x + 28, y + 8, Color.WHITE.getRGB());
 			if (entry != null) {
 				PlayerSkinDrawer.draw(context, entry.getSkinTextures(), x + 5, y + 5, 20);
 			}
 			int infoY = y + 35;
 			int lineHeight = 25;
-
 			TextRenderer.drawString("§7Type: " + (entry == null ? "§cBot" : "§aPlayer"), context, x + 5, infoY, Color.WHITE.getRGB());
 			infoY += lineHeight;
-
 			float health = player.getHealth() + player.getAbsorptionAmount();
 			TextRenderer.drawString("§7Health: §a" + String.format("%.1f❤", health), context, x + 5, infoY, Color.WHITE.getRGB());
 			infoY += lineHeight;
-
 			TextRenderer.drawString("§7Invisible: " + (player.isInvisible() ? "§cYes" : "§aNo"), context, x + 5, infoY, Color.WHITE.getRGB());
 			infoY += lineHeight;
-
 			if (entry != null) {
 				int ping = entry.getLatency();
 				Color pingColor = ping < 100 ? Color.GREEN : ping < 200 ? Color.YELLOW : Color.RED;
@@ -137,7 +129,7 @@ public final class TargetHud extends Module implements HudListener, PacketSendLi
 		} else {
 			animation = RenderUtils.fast(animation, 1, 15f);
 		}
-		RenderUtils.scaledProjection();
+		context.getMatrices().popMatrix();
 	}
 	private Color getHealthColor(float health, Color themeColor) {
 		if (health > 15f) return themeColor;
@@ -151,7 +143,6 @@ public final class TargetHud extends Module implements HudListener, PacketSendLi
 		if (health > 5f) return new Color(255, 165, 0);
 		return new Color(255, 0, 0);
 	}
-
 	private Color getDamageTickColor(int hurtTime, Color themeColor) {
 		float progress = Math.min(1f, hurtTime / 10f);
 		return new Color(
@@ -160,10 +151,6 @@ public final class TargetHud extends Module implements HudListener, PacketSendLi
 				(int) (themeColor.getBlue() * (1 - progress))
 		);
 	}
-
-
-
-
 	@Override
 	public void onPacketSend(PacketSendEvent event) {
 		if (event.packet instanceof PlayerInteractEntityC2SPacket packet) {

@@ -13,46 +13,38 @@ public final class JumpOptimizer extends Module implements TickListener {
 
 	public JumpOptimizer() {
 		super(EncryptedString.of("No Jump Delay"),
-				EncryptedString.of("Lets you jump faster."),
+				EncryptedString.of("Lets you jump faster, detected by AC"),
 				-1,
 				Category.optimizer);
 	}
-
 	@Override
 	public void onEnable() {
 		eventManager.add(TickListener.class, this);
 		super.onEnable();
 	}
-
 	@Override
 	public void onDisable() {
 		eventManager.remove(TickListener.class, this);
 		super.onDisable();
 	}
-
 	@Override
 	public void onTick() {
 		if (mc.currentScreen != null || mc.player == null)
 			return;
-
 		FluidState fluidState = mc.world.getFluidState(mc.player.getBlockPos());
 		if (fluidState.isIn(FluidTags.WATER) || fluidState.isIn(FluidTags.LAVA)) {
 			wasJumping = false;
 			return;
 		}
-
 		if (!mc.player.isOnGround()) {
 			wasJumping = false;
 			return;
 		}
-
 		boolean jumping = GLFW.glfwGetKey(mc.getWindow().getHandle(), GLFW.GLFW_KEY_SPACE) == GLFW.GLFW_PRESS;
-
 		if (jumping && !wasJumping) {
 			mc.options.jumpKey.setPressed(false);
 			mc.player.jump();
 		}
-
 		wasJumping = jumping;
 	}
 }

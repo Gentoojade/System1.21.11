@@ -7,15 +7,13 @@ import dlindustries.vigillant.system.module.Module;
 import dlindustries.vigillant.system.module.setting.BooleanSetting;
 import dlindustries.vigillant.system.module.setting.MinMaxSetting;
 import dlindustries.vigillant.system.module.setting.ModeSetting;
-import dlindustries.vigillant.system.module.setting.NumberSetting;
 import dlindustries.vigillant.system.utils.EncryptedString;
 import dlindustries.vigillant.system.utils.MouseSimulation;
 import dlindustries.vigillant.system.utils.TimerUtils;
 import dlindustries.vigillant.system.utils.WorldUtils;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.decoration.EndCrystalEntity;
-import net.minecraft.entity.mob.ZombieEntity;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.*;
 import net.minecraft.registry.tag.ItemTags;
@@ -29,19 +27,15 @@ public final class TriggerBot extends Module implements TickListener, AttackList
         WEAPONS("Weapons"),
         MACE_AND_WEAPONS("Mace and Weapons"),
         ALL_ITEMS("All Items");
-
         private final String name;
-
         Mode(String name) {
             this.name = name;
         }
-
         @Override
         public String toString() {
             return name;
         }
     }
-
     private final ModeSetting<Mode> mode = new ModeSetting<>(EncryptedString.of("Mode"), Mode.WEAPONS, Mode.class);
     private final BooleanSetting inScreen = new BooleanSetting(EncryptedString.of("Work In Screen"), false)
             .setDescription(EncryptedString.of("Will trigger even if youre inside a screen"));
@@ -69,16 +63,11 @@ public final class TriggerBot extends Module implements TickListener, AttackList
             .setDescription(EncryptedString.of("Bypasses stray's Anti-TriggerBot and other strict anticheats"));
     private final BooleanSetting allEntities = new BooleanSetting(EncryptedString.of("All Entities"), false)
             .setDescription(EncryptedString.of("Will attack all entities"));
-    private final BooleanSetting useShield = new BooleanSetting(EncryptedString.of("Use Shield"), false)
-            .setDescription(EncryptedString.of("Uses shield if it's in your offhand"));
-    private final NumberSetting shieldTime = new NumberSetting(EncryptedString.of("Shield Time"), 100, 1000, 350, 1);
     private final BooleanSetting sticky = new BooleanSetting(EncryptedString.of("Same Player"), false)
-            .setDescription(EncryptedString.of("Hits the player that was recently attacked, good for FFA"));
-
+            .setDescription(EncryptedString.of("Hits the player that was recently attacked, good for FFAs"));
     private final TimerUtils timer = new TimerUtils();
     private int currentSwordDelay, currentAxeDelay;
     private boolean isMaceAttack = false;
-
     public TriggerBot() {
         super(EncryptedString.of("Trigger Bot"),
                 EncryptedString.of("Automatically hits players for you"),
@@ -86,9 +75,8 @@ public final class TriggerBot extends Module implements TickListener, AttackList
                 Category.sword);
         addSettings(mode, inScreen, whileUse, onLeftClick, swordDelay, axeDelay, checkShield,
                 whileAscend, sticky, onlyCritSword, onlyCritAxe, swing, clickSimulation,
-                strayBypass, allEntities, useShield, shieldTime);
+                strayBypass, allEntities);
     }
-
     @Override
     public void onEnable() {
         currentSwordDelay = swordDelay.getRandomValueInt();
@@ -98,35 +86,29 @@ public final class TriggerBot extends Module implements TickListener, AttackList
         eventManager.add(AttackListener.class, this);
         super.onEnable();
     }
-
     @Override
     public void onDisable() {
         eventManager.remove(TickListener.class, this);
         eventManager.remove(AttackListener.class, this);
         super.onDisable();
     }
-
     @SuppressWarnings("all")
     @Override
     public void onTick() {
         try {
             if (!inScreen.getValue() && mc.currentScreen != null)
                 return;
-
             Item item = mc.player.getMainHandStack().getItem();
             if (!isItemAllowed(item)) {
                 return;
             }
-
             if (onLeftClick.getValue() && GLFW.glfwGetMouseButton(mc.getWindow().getHandle(), GLFW.GLFW_MOUSE_BUTTON_LEFT) != GLFW.GLFW_PRESS)
                 return;
-
             if (((mc.player.getOffHandStack().getItem().getComponents().contains(DataComponentTypes.FOOD) ||
                     mc.player.getOffHandStack().getItem() instanceof ShieldItem) &&
                     GLFW.glfwGetMouseButton(mc.getWindow().getHandle(), GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS) &&
                     !whileUse.getValue())
                 return;
-
             if (!whileAscend.getValue() && ((!mc.player.isOnGround() && mc.player.getVelocity().y > 0) ||
                     (!mc.player.isOnGround() && mc.player.fallDistance <= 0.0F)))
                 return;
@@ -137,12 +119,10 @@ public final class TriggerBot extends Module implements TickListener, AttackList
             } else if (item instanceof AxeItem) {
                 handleAxeMode();
             } else {
-
                 handleAllItemsMode();
             }
         } catch (Exception ignored) {}
     }
-
 
     private boolean isItemAllowed(Item item) {
         Mode currentMode = mode.getMode();
@@ -156,14 +136,11 @@ public final class TriggerBot extends Module implements TickListener, AttackList
         else if (currentMode == Mode.MACE_AND_WEAPONS) {
             return item instanceof MaceItem || isSword(item) || item instanceof AxeItem;
         }
-
         return true;
     }
-
     private boolean isSword(Item item) {
         return new ItemStack(item).isIn(ItemTags.SWORDS);
     }
-
     private void handleMaceMode() {
         if (mc.crosshairTarget instanceof EntityHitResult hit) {
             Entity entity = hit.getEntity();
@@ -175,145 +152,89 @@ public final class TriggerBot extends Module implements TickListener, AttackList
             if (onlyCritSword.getValue() && mc.player.fallDistance <= 0.0F)
                 return;
             isMaceAttack = true;
-            if (useShield.getValue() && mc.player.getOffHandStack().getItem() == Items.SHIELD && mc.player.isBlocking()) {
-                MouseSimulation.mouseRelease(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
-            }
-
             WorldUtils.hitEntity(entity, swing.getValue());
-
             if (clickSimulation.getValue()) {
                 MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_LEFT);
             }
-
             isMaceAttack = false;
         }
     }
-
     private void handleSwordMode() {
         if (mc.crosshairTarget instanceof EntityHitResult hit) {
             Entity entity = hit.getEntity();
-
             assert mc.player.getAttacking() != null;
             if (sticky.getValue() && entity != mc.player.getAttacking())
                 return;
-
-            if (entity instanceof PlayerEntity || (strayBypass.getValue() && entity instanceof ZombieEntity) || (allEntities.getValue() && entity != null)) {
-
-                if (entity instanceof PlayerEntity player) {
-                    if (checkShield.getValue() && player.isBlocking() && !WorldUtils.isShieldFacingAway(player))
-                        return;
-                }
-
-                if (onlyCritSword.getValue() && mc.player.fallDistance <= 0.0F)
+            if (!isValidEntity(entity))
+                return;
+            if (entity instanceof PlayerEntity player) {
+                if (checkShield.getValue() && player.isBlocking() && !WorldUtils.isShieldFacingAway(player))
                     return;
+            }
+            if (onlyCritSword.getValue() && mc.player.fallDistance <= 0.0F)
+                return;
+            if (timer.delay(currentSwordDelay)) {
+                WorldUtils.hitEntity(entity, swing.getValue());
 
-                if (timer.delay(currentSwordDelay)) {
-                    if (useShield.getValue()) {
-                        if (mc.player.getOffHandStack().getItem() == Items.SHIELD && mc.player.isBlocking())
-                            MouseSimulation.mouseRelease(GLFW.GLFW_MOUSE_BUTTON_RIGHT);
-                    }
+                if (clickSimulation.getValue())
+                    MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_LEFT);
 
-                    WorldUtils.hitEntity(entity, swing.getValue());
-
-                    if (clickSimulation.getValue())
-                        MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-
-                    currentSwordDelay = swordDelay.getRandomValueInt();
-                    timer.reset();
-                } else {
-                    if (useShield.getValue()) {
-                        if (mc.player.getOffHandStack().getItem() == Items.SHIELD) {
-                            int useFor = shieldTime.getValueInt();
-                            MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_RIGHT, useFor);
-                        }
-                    }
-                }
+                currentSwordDelay = swordDelay.getRandomValueInt();
+                timer.reset();
             }
         }
     }
-
     private void handleAxeMode() {
         if (mc.crosshairTarget instanceof EntityHitResult hit) {
             Entity entity = hit.getEntity();
-
-            if (entity instanceof PlayerEntity || (strayBypass.getValue() && entity instanceof ZombieEntity) || (allEntities.getValue() && entity != null)) {
-                if (entity instanceof PlayerEntity player) {
-                    if (checkShield.getValue() && player.isBlocking() && !WorldUtils.isShieldFacingAway(player))
-                        return;
-                }
-
-                if (onlyCritAxe.getValue() && mc.player.fallDistance <= 0.0F)
+            if (!isValidEntity(entity))
+                return;
+            if (entity instanceof PlayerEntity player) {
+                if (checkShield.getValue() && player.isBlocking() && !WorldUtils.isShieldFacingAway(player))
                     return;
-
-                if (timer.delay(currentAxeDelay)) {
-                    WorldUtils.hitEntity(entity, swing.getValue());
-
-                    if (clickSimulation.getValue())
-                        MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-
-                    currentAxeDelay = axeDelay.getRandomValueInt();
-                    timer.reset();
-                } else {
-                    if (useShield.getValue()) {
-                        if (mc.player.getOffHandStack().getItem() == Items.SHIELD) {
-                            int useFor = shieldTime.getValueInt();
-                            MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_RIGHT, useFor);
-                        }
-                    }
-                }
+            }
+            if (onlyCritAxe.getValue() && mc.player.fallDistance <= 0.0F)
+                return;
+            if (timer.delay(currentAxeDelay)) {
+                WorldUtils.hitEntity(entity, swing.getValue());
+                if (clickSimulation.getValue())
+                    MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+                currentAxeDelay = axeDelay.getRandomValueInt();
+                timer.reset();
             }
         }
     }
-
     private void handleAllItemsMode() {
         if (mc.crosshairTarget instanceof EntityHitResult entityHit && mc.crosshairTarget.getType() == HitResult.Type.ENTITY) {
             Entity entity = entityHit.getEntity();
-
             assert mc.player.getAttacking() != null;
             if (sticky.getValue() && entity != mc.player.getAttacking())
                 return;
-
-            if (entity instanceof PlayerEntity || (strayBypass.getValue() && entity instanceof ZombieEntity) || (allEntities.getValue() && entity != null)) {
-                if (entity instanceof PlayerEntity player) {
-                    if (checkShield.getValue() && player.isBlocking() && !WorldUtils.isShieldFacingAway(player))
-                        return;
-                }
-
-                if (onlyCritSword.getValue() && mc.player.fallDistance <= 0.0F)
+            if (!isValidEntity(entity))
+                return;
+            if (entity instanceof PlayerEntity player) {
+                if (checkShield.getValue() && player.isBlocking() && !WorldUtils.isShieldFacingAway(player))
                     return;
-
-                if (timer.delay(currentSwordDelay)) {
-                    WorldUtils.hitEntity(entity, swing.getValue());
-
-                    if (clickSimulation.getValue())
-                        MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_LEFT);
-
-                    currentSwordDelay = swordDelay.getRandomValueInt();
-                    timer.reset();
-                } else {
-                    if (useShield.getValue()) {
-                        if (mc.player.getOffHandStack().getItem() == Items.SHIELD) {
-                            int useFor = shieldTime.getValueInt();
-                            MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_RIGHT, useFor);
-                        }
-                    }
-                }
+            }
+            if (onlyCritSword.getValue() && mc.player.fallDistance <= 0.0F)
+                return;
+            if (timer.delay(currentSwordDelay)) {
+                WorldUtils.hitEntity(entity, swing.getValue());
+                if (clickSimulation.getValue())
+                    MouseSimulation.mouseClick(GLFW.GLFW_MOUSE_BUTTON_LEFT);
+                currentSwordDelay = swordDelay.getRandomValueInt();
+                timer.reset();
             }
         }
     }
-
     private boolean isValidEntity(Entity entity) {
-        return entity instanceof PlayerEntity ||
-                (strayBypass.getValue() && entity instanceof ZombieEntity ) ||
-                (allEntities.getValue() && entity != null);
+        return entity instanceof LivingEntity && entity.isAlive();
     }
-
     @Override
     public void onAttack(AttackEvent event) {
         if (GLFW.glfwGetMouseButton(mc.getWindow().getHandle(), GLFW.GLFW_MOUSE_BUTTON_LEFT) != GLFW.GLFW_PRESS)
             event.cancel();
     }
-
     public boolean isMaceAttackActive() {
         return isMaceAttack;
     }

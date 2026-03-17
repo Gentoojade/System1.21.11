@@ -20,29 +20,23 @@ import org.joml.Matrix3x2fStack;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
-
 import java.awt.*;
 import java.util.function.Consumer;
 
 import static dlindustries.vigillant.system.system.mc;
-
 public final class RenderUtils {
 	public static boolean rendering3D = true;
-
 	public static Vec3d getCameraPos() {
 		return mc.gameRenderer.getCamera().getFocusedEntity() != null
 				? new Vec3d(mc.gameRenderer.getCamera().getFocusedEntity().getX(), mc.gameRenderer.getCamera().getFocusedEntity().getY(), mc.gameRenderer.getCamera().getFocusedEntity().getZ())
 				: Vec3d.ZERO;
 	}
-
 	public static double deltaTime() {
 		return mc.getCurrentFps() > 0 ? (1.0000 / mc.getCurrentFps()) : 1;
 	}
-
 	public static float fast(float end, float start, float multiple) {
 		return (1 - MathHelper.clamp((float) (deltaTime() * multiple), 0, 1)) * end + MathHelper.clamp((float) (deltaTime() * multiple), 0, 1) * start;
 	}
-
 	public static Vec3d getPlayerLookVec(PlayerEntity player) {
 		float f = 0.017453292F;
 		float pi = 3.1415927F;
@@ -52,17 +46,12 @@ public final class RenderUtils {
 		float f4 = MathHelper.sin(-player.getPitch() * f);
 		return (new Vec3d((f2 * f3), f4, (f1 * f3))).normalize();
 	}
-
 	public static void unscaledProjection() {
-		// projection handled by client pipeline
 		rendering3D = false;
 	}
-
 	public static void scaledProjection() {
-		// projection handled by client pipeline
 		rendering3D = true;
 	}
-
 	public static void renderRoundedQuad(MatrixStack matrices, Color c, double x, double y, double x2, double y2, double corner1, double corner2, double corner3, double corner4, double samples) {
 		int color = c.getRGB();
 		Matrix4f matrix = matrices.peek().getPositionMatrix();
@@ -71,33 +60,26 @@ public final class RenderUtils {
 		float h = (float) (color >> 8 & 255) / 255.0F;
 		float k = (float) (color & 255) / 255.0F;
 		GlStateManager._enableBlend();
-		
 		renderRoundedQuadInternal(matrix, g, h, k, f, x, y, x2, y2, corner1, corner2, corner3, corner4, samples);
 		GlStateManager._enableCull();
 		GlStateManager._disableBlend();
 	}
-
 	private static void setup() {
 		GlStateManager._enableBlend();
-			}
-
+	}
 	private static void cleanup() {
 		GlStateManager._enableCull();
 		GlStateManager._disableBlend();
 	}
-
 	public static void renderRoundedQuad(MatrixStack matrices, Color c, double x, double y, double x1, double y1, double rad, double samples) {
 		renderRoundedQuad(matrices, c, x, y, x1, y1, rad, rad, rad, rad, samples);
 	}
-
 	public static void renderRoundedQuad(Matrix3x2fStack matrices, Color c, double x, double y, double x2, double y2, double corner1, double corner2, double corner3, double corner4, double samples) {
 		renderRoundedQuad(toMatrixStack(matrices), c, x, y, x2, y2, corner1, corner2, corner3, corner4, samples);
 	}
-
 	public static void renderRoundedQuad(Matrix3x2fStack matrices, Color c, double x, double y, double x1, double y1, double rad, double samples) {
 		renderRoundedQuad(toMatrixStack(matrices), c, x, y, x1, y1, rad, samples);
 	}
-
 	public static void renderRoundedOutlineInternal(Matrix4f matrix, float cr, float cg, float cb, float ca, double fromX, double fromY, double toX, double toY, double radC1, double radC2, double radC3, double radC4, double width, double samples) {
 		BufferBuilder bufferBuilder = Tessellator.getInstance().begin(VertexFormat.DrawMode.TRIANGLE_STRIP, VertexFormats.POSITION_COLOR);
 
@@ -129,7 +111,8 @@ public final class RenderUtils {
 		float cos = (float) (rad);
 		bufferBuilder.vertex(matrix, (float) current[0], (float) current[1] + cos, 0.0F).color(cr, cg, cb, ca);
 		bufferBuilder.vertex(matrix, (float) (current[0]), (float) (current[1] + cos + width), 0.0F).color(cr, cg, cb, ca);
-		bufferBuilder.end();
+		BuiltBuffer built = bufferBuilder.end();
+		RenderLayers.debugFilledBox().draw(built);
 	}
 	public static void renderFilledBox(MatrixStack matrices, Box box, Color color) {
 		renderFilledBox(matrices,
@@ -137,7 +120,6 @@ public final class RenderUtils {
 				(float) box.maxX, (float) box.maxY, (float) box.maxZ,
 				color);
 	}
-
 	public static void renderFilledBox(MatrixStack matrices, float minX, float minY, float minZ,
 									   float maxX, float maxY, float maxZ, Color color) {
 		GlStateManager._disableDepthTest();
@@ -212,35 +194,26 @@ public final class RenderUtils {
 		Matrix4f matrix = entry.getPositionMatrix();
 		buffer.vertex(matrix, minX, minY, minZ).color(r, g, b, a).normal(0, 1, 0);
 		buffer.vertex(matrix, maxX, minY, minZ).color(r, g, b, a).normal(0, 1, 0);
-
 		buffer.vertex(matrix, maxX, minY, minZ).color(r, g, b, a).normal(0, 1, 0);
 		buffer.vertex(matrix, maxX, minY, maxZ).color(r, g, b, a).normal(0, 1, 0);
-
 		buffer.vertex(matrix, maxX, minY, maxZ).color(r, g, b, a).normal(0, 1, 0);
 		buffer.vertex(matrix, minX, minY, maxZ).color(r, g, b, a).normal(0, 1, 0);
-
 		buffer.vertex(matrix, minX, minY, maxZ).color(r, g, b, a).normal(0, 1, 0);
 		buffer.vertex(matrix, minX, minY, minZ).color(r, g, b, a).normal(0, 1, 0);
 		buffer.vertex(matrix, minX, maxY, minZ).color(r, g, b, a).normal(0, 1, 0);
 		buffer.vertex(matrix, maxX, maxY, minZ).color(r, g, b, a).normal(0, 1, 0);
-
 		buffer.vertex(matrix, maxX, maxY, minZ).color(r, g, b, a).normal(0, 1, 0);
 		buffer.vertex(matrix, maxX, maxY, maxZ).color(r, g, b, a).normal(0, 1, 0);
-
 		buffer.vertex(matrix, maxX, maxY, maxZ).color(r, g, b, a).normal(0, 1, 0);
 		buffer.vertex(matrix, minX, maxY, maxZ).color(r, g, b, a).normal(0, 1, 0);
-
 		buffer.vertex(matrix, minX, maxY, maxZ).color(r, g, b, a).normal(0, 1, 0);
 		buffer.vertex(matrix, minX, maxY, minZ).color(r, g, b, a).normal(0, 1, 0);
 		buffer.vertex(matrix, minX, minY, minZ).color(r, g, b, a).normal(0, 1, 0);
 		buffer.vertex(matrix, minX, maxY, minZ).color(r, g, b, a).normal(0, 1, 0);
-
 		buffer.vertex(matrix, maxX, minY, minZ).color(r, g, b, a).normal(0, 1, 0);
 		buffer.vertex(matrix, maxX, maxY, minZ).color(r, g, b, a).normal(0, 1, 0);
-
 		buffer.vertex(matrix, maxX, minY, maxZ).color(r, g, b, a).normal(0, 1, 0);
 		buffer.vertex(matrix, maxX, maxY, maxZ).color(r, g, b, a).normal(0, 1, 0);
-
 		buffer.vertex(matrix, minX, minY, maxZ).color(r, g, b, a).normal(0, 1, 0);
 		buffer.vertex(matrix, minX, maxY, maxZ).color(r, g, b, a).normal(0, 1, 0);
 
@@ -296,7 +269,10 @@ public final class RenderUtils {
 			double cos = Math.cos(radians) * rad;
 			bufferBuilder.vertex(matrix, (float) (originX + sin), (float) (originY + cos), 0).color(g, h, k, f);
 		}
-		bufferBuilder.end();
+
+		// FIX: actually draw the built buffer instead of discarding it
+		BuiltBuffer built = bufferBuilder.end();
+		RenderLayers.debugFilledBox().draw(built);
 		cleanup();
 	}
 
@@ -325,7 +301,6 @@ public final class RenderUtils {
 		float h = (float) (color >> 8 & 255) / 255.0F;
 		float k = (float) (color & 255) / 255.0F;
 		setup();
-
 		renderRoundedOutlineInternal(matrix, g, h, k, f, fromX, fromY, toX, toY, rad1, rad2, rad3, rad4, width, samples);
 		cleanup();
 	}
@@ -349,7 +324,10 @@ public final class RenderUtils {
 			float cos = (float) (Math.cos(rad1) * rad);
 			bufferBuilder.vertex(matrix, (float) current[0] + sin, (float) current[1] + cos, 0.0F).color(cr, cg, cb, ca);
 		}
-		bufferBuilder.end();
+
+		// FIX: actually draw the built buffer instead of discarding it
+		BuiltBuffer built = bufferBuilder.end();
+		RenderLayers.debugFilledBox().draw(built);
 	}
 
 	interface RenderAction {
@@ -365,7 +343,7 @@ public final class RenderUtils {
 			GL11.glHint(GL11.GL_LINE_SMOOTH_HINT, GL11.GL_NICEST);
 		}
 		GL11.glDepthFunc(GL11.GL_ALWAYS);
-						GlStateManager._enableBlend();
+		GlStateManager._enableBlend();
 
 		genericAABBRender(
 				VertexFormat.DrawMode.DEBUG_LINES,

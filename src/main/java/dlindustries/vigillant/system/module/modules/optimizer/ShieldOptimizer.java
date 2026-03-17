@@ -7,7 +7,7 @@ import dlindustries.vigillant.system.utils.EncryptedString;
 public final class ShieldOptimizer extends Module {
     public ShieldOptimizer() {
         super(EncryptedString.of("Shield Optimizer"),
-                EncryptedString.of("Tries to remove the base use time of 5 ticks on shields before they actually work"),
+                EncryptedString.of("Tries to remove the base use time of 5 ticks on shields before they actually work, detected by AC"),
                 -1,
                 Category.optimizer);
     }

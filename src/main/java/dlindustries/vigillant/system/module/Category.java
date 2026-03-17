@@ -6,9 +6,10 @@ public enum Category {
 	sword(EncryptedString.of("Sword")),
 	CRYSTAL(EncryptedString.of("Crystal")),
 	pot(EncryptedString.of("Potions")),
-	mace(EncryptedString.of("Mace")),
+	mace(EncryptedString.of("SpearMace")),
 	optimizer(EncryptedString.of("Optimizer")),
 	RENDER(EncryptedString.of("Render")),
+	ESP(EncryptedString.of("Esp")),
 	CLIENT(EncryptedString.of("Client"));
 	public final CharSequence name;
 
