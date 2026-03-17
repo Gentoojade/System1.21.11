@@ -163,11 +163,12 @@ For those who are unfamiliar with the license, here is a summary of its main poi
 System uses Gradle to build the client. Install the latest version of Gradle onto your computer and install IntelliJ IDEA Ultimate, or use the free community edition.
 
 1. Clone the repository using `git clone --recurse-submodules https://github.com/DLindustries/System`.
-2. CD into the local repository with the command `cd System`.
-3. Run `./gradlew genSources`.
-4. Open the folder in IntelliJ — feel free to recode the client.
-5. To build, simply run `./gradlew build` or create a run configuration for Gradle with the build command.
-6. Enjoy System! :D
+2. CD into the local repository with the command `cd System1.21.11`.
+3. IF ON LINUX RUN 'chmod +x gradlew 
+4. Run `./gradlew genSources`.
+5. Open the folder in IntelliJ — feel free to recode the client.
+6. To build, simply run `./gradlew build` or create a run configuration for Gradle with the build command.
+7. Enjoy System! :D
 
 ## Addition info
 
