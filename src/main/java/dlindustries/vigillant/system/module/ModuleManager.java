@@ -1,9 +1,7 @@
 package dlindustries.vigillant.system.module;
 
 import dlindustries.vigillant.system.event.events.ButtonListener;
-import dlindustries.vigillant.system.module.modules.client.ClickGUI;
-import dlindustries.vigillant.system.module.modules.client.NameProtect;
-import dlindustries.vigillant.system.module.modules.client.NineElevenPrevent;
+import dlindustries.vigillant.system.module.modules.client.*;
 import dlindustries.vigillant.system.module.modules.crystal.*;
 import dlindustries.vigillant.system.module.modules.sword.*;
 import dlindustries.vigillant.system.module.modules.mace.FireworkMacro;
@@ -40,6 +38,7 @@ public final class ModuleManager implements ButtonListener {
 		add(new DoubleAnchor());
 		add(new HoverTotem());
 		add(new AnchorMacro());
+		add(new AirAnchor());
 		add(new AutoCrystal());
 		add(new AutoDoubleHand());
 		add(new dtapsetup());
@@ -79,9 +78,14 @@ public final class ModuleManager implements ButtonListener {
 		add(new StorageEsp());
 		add(new ClickGUI());
 		add(new NameProtect());
+		add(new SkinSpoofer());
 		add(new NineElevenPrevent());
 		add(new Fullbright());
 		add(new RekitMacro());
+		add(new AutoDrain());
+		add(new AutoTool());
+		add(new AutoPickaxe());
+		add(new SwingSpeed());
 	}
 	public List<Module> getEnabledModules() {
 		return modules.stream()

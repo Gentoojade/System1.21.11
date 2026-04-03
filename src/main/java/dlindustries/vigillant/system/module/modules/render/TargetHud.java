@@ -140,8 +140,8 @@ public final class TargetHud extends Module implements HudListener, PacketSendLi
 					(themeColor.getBlue()) / 2
 			);
 		}
-		if (health > 5f) return new Color(255, 165, 0);
-		return new Color(255, 0, 0);
+		if (health > 5f) return new Color(55, 0, 255);
+		return new Color(132, 0, 255);
 	}
 	private Color getDamageTickColor(int hurtTime, Color themeColor) {
 		float progress = Math.min(1f, hurtTime / 10f);

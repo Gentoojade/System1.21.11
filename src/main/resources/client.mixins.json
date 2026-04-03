@@ -34,6 +34,13 @@
     "InventorySwitchMixin",
     "ClientWorldMixin",
     "LivingEntityMixin",
+    "AbstractClientPlayerEntityMixin",
+    "AutoToolMixin",
+    "ParticlesMixin$ParticleManagerMixin",
+    "ParticlesMixin$ClientWorldMixin",
+    "ParticlesMixin$InGameOverlayRendererMixin",
+    "ParticlesMixin$InGameHudMixin",
+    "SwingSpeedMixin",
     "TextVisitFactoryMixin"
 
   ],

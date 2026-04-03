@@ -10,7 +10,6 @@ import org.lwjgl.glfw.GLFW;
 
 public final class JumpOptimizer extends Module implements TickListener {
 	private boolean wasJumping = false;
-
 	public JumpOptimizer() {
 		super(EncryptedString.of("No Jump Delay"),
 				EncryptedString.of("Lets you jump faster, detected by AC"),

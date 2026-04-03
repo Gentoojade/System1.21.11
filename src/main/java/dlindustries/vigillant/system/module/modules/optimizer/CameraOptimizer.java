@@ -22,18 +22,27 @@ public final class CameraOptimizer extends Module implements CameraUpdateListene
             EncryptedString.of("No Overlay"),
             true
     ).setDescription(EncryptedString.of("Removes water and lava visual effects"));
+    private final BooleanSetting noParticles = new BooleanSetting(
+            EncryptedString.of("No Particles"),
+            true
+    ).setDescription(EncryptedString.of("Removes all world particles and fire screen overlay"));
+    private final BooleanSetting noBreakParticles = new BooleanSetting(
+            EncryptedString.of("No Break Particles"),
+            false
+    ).setDescription(EncryptedString.of("Removes block breaking particles"));
     private final BooleanSetting alwaysOn = new BooleanSetting(
             EncryptedString.of("Always On"),
             true
     ).setDescription(EncryptedString.of("If enabled, effects are active whenever the module is on"));
+
     public CameraOptimizer() {
         super(
                 EncryptedString.of("Camera Optimizer"),
-                EncryptedString.of("Improves camera behavior and removes restrictions Pairs well with the Freelook Mod"),
+                EncryptedString.of("Improves camera behavior and removes restrictions. Pairs well with the Freelook Mod"),
                 -1,
                 Category.RENDER
         );
-        addSettings(toggleKey, noClip, noOverlay, alwaysOn);
+        addSettings(toggleKey, noClip, noOverlay, noParticles, noBreakParticles, alwaysOn);
     }
     @Override
     public void onEnable() {
@@ -57,6 +66,14 @@ public final class CameraOptimizer extends Module implements CameraUpdateListene
     }
     public boolean isNoOverlayEnabled() {
         if (!isEnabled() || !noOverlay.getValue()) return false;
+        return alwaysOn.getValue() || isToggleKeyPressed();
+    }
+    public boolean isNoParticlesEnabled() {
+        if (!isEnabled() || !noParticles.getValue()) return false;
+        return alwaysOn.getValue() || isToggleKeyPressed();
+    }
+    public boolean isNoBreakParticlesEnabled() {
+        if (!isEnabled() || !noBreakParticles.getValue()) return false;
         return alwaysOn.getValue() || isToggleKeyPressed();
     }
 }

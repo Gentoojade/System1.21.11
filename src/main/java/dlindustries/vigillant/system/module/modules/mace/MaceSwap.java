@@ -22,12 +22,16 @@ import net.minecraft.util.hit.HitResult;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class MaceSwap extends Module implements AttackListener, TickListener {
     private final BooleanSetting switchBack = new BooleanSetting(EncryptedString.of("Switch Back"), true)
             .setDescription(EncryptedString.of("Switch back to sword after attack"));
 
-    // Now in milliseconds (0-1000ms, default 250ms ≈ 5 ticks)
     private final NumberSetting switchDelay = new NumberSetting(EncryptedString.of("Switch Delay"), 0, 250, 50, 1)
             .setDescription(EncryptedString.of("Delay after attacking before switching back, in milliseconds"));
 
@@ -64,24 +68,48 @@ public final class MaceSwap extends Module implements AttackListener, TickListen
     private final NumberSetting minShieldHold = new NumberSetting(EncryptedString.of("Min Shield Hold"), 0, 250, 50, 1)
             .setDescription(EncryptedString.of("Minimum time opponent must hold shield before StunSlamming"));
 
-    private final NumberSetting stunMaceDelayMs = new NumberSetting(EncryptedString.of("Mace Hit Delay"), 0, 50, 30, 1)
+    private final NumberSetting stunMaceDelayMs = new NumberSetting(EncryptedString.of("Mace Hit Delay"), 0, 50, 0, 1)
             .setDescription(EncryptedString.of("Delay between axe hit and mace hit in milliseconds"));
 
+    private final BooleanSetting tickLock = new BooleanSetting(EncryptedString.of("Tick Lock"), true)
+            .setDescription(EncryptedString.of("Swap to sword for before axe hit during Stun Slam, to create a tick lock"));
+
+    private final BooleanSetting shieldVaporizer = new BooleanSetting(EncryptedString.of("Shield Nuker"), false)
+            .setDescription(EncryptedString.of("Only works when Stun Slam is off, Swaps to density mace and clicks at set cps, Nuking the shield of your victim, grapes them in the process Aswell"));
+
+    private final NumberSetting vaporizerCps = new NumberSetting(EncryptedString.of("Nuker's CPS"), 10, 320, 40, 1)
+            .setDescription(EncryptedString.of("Clicks per second, very blatant over 20 cps, don't use on servers with AC, AT ALL"));
+
+    private final BooleanSetting nukerDensityOnly = new BooleanSetting(EncryptedString.of("Density Only"), false)
+            .setDescription(EncryptedString.of("Shield Nuker only activates when you are already holding the density mace. Also ignores shield facing checks"));
+
+    private static final float VAPORIZER_MIN_FALL  = 1.5f;
+    private static final float STUN_MIN_FALL       = 1.5f;
+    private static final int   STUN_SWORD_DELAY_MS = 10;
     private boolean shouldSwitchBack;
     private int originalSlot = -1;
-    private long switchTimerStart = 0;          // timestamp when switch-back timer started
+    private long switchTimerStart = 0;
     private boolean autoSwapped;
     private boolean sessionActive;
     private final Map<UUID, Long> shieldStartTimes = new HashMap<>();
     private PlayerEntity currentTarget;
+    private int slamTick       = 0;
+    private long slamTimerStart = 0;
+    private PlayerEntity slamTarget;
+    private int slamAxeSlot    = -1;
+    private int slamSwordSlot  = -1;
+    private final AtomicInteger pendingClicks    = new AtomicInteger(0);
+    private volatile boolean    vaporizerRunning = false;
+    private boolean vaporizerActive = false;
+    private Entity  vaporizerTarget = null;
 
-    private boolean stunSlamActive;
-    private int stunSlamPhase;                  // 0 = idle, 1 = wait for axe hit, 2 = wait for mace delay
-    private long stunSlamTimerStart;             // timestamp for delay
-    private PlayerEntity stunSlamTarget;
-    private int stunSlamAxeSlot;
-    private static final float STUN_MIN_FALL = 1.5f;
-
+    private final ScheduledExecutorService vaporizerExecutor =
+            Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "vaporizer-timer");
+                t.setDaemon(true);
+                return t;
+            });
+    private ScheduledFuture<?> vaporizerFuture = null;
     public MaceSwap() {
         super(EncryptedString.of("Mace Swap"),
                 EncryptedString.of("Swaps to selected breach mace slot when attacking with sword or does everything for you"),
@@ -93,10 +121,10 @@ public final class MaceSwap extends Module implements AttackListener, TickListen
                 dualMace, densitySlot, maceHeightThreshold,
                 respectShield,
                 stunSlam, minShieldHold,
-                stunMaceDelayMs
+                stunMaceDelayMs, tickLock,
+                shieldVaporizer, vaporizerCps, nukerDensityOnly
         );
     }
-
     @Override
     public void onEnable() {
         eventManager.add(AttackListener.class, this);
@@ -104,11 +132,11 @@ public final class MaceSwap extends Module implements AttackListener, TickListen
         resetState();
         super.onEnable();
     }
-
     @Override
     public void onDisable() {
         eventManager.remove(AttackListener.class, this);
         eventManager.remove(TickListener.class, this);
+        stopVaporizer();
         if (shouldSwitchBack && originalSlot != -1) {
             mc.player.getInventory().setSelectedSlot(originalSlot);
         } else if (autoSwapped && originalSlot != -1) {
@@ -117,41 +145,40 @@ public final class MaceSwap extends Module implements AttackListener, TickListen
         shieldStartTimes.clear();
         super.onDisable();
     }
-
     private boolean isMaceInSlot(int slotIndex) {
         if (slotIndex < 0 || slotIndex >= 9) return false;
-        ItemStack stack = mc.player.getInventory().getStack(slotIndex);
-        return stack.getItem() == Items.MACE;
+        return mc.player.getInventory().getStack(slotIndex).getItem() == Items.MACE;
     }
-
     private int findAxeSlot() {
         for (int i = 0; i < 9; i++) {
-            ItemStack stack = mc.player.getInventory().getStack(i);
-            if (stack.getItem() instanceof AxeItem) {
-                return i;
-            }
+            if (mc.player.getInventory().getStack(i).getItem() instanceof AxeItem) return i;
         }
         return -1;
     }
-
+    private int findSwordSlot() {
+        for (int i = 0; i < 9; i++) {
+            if (mc.player.getInventory().getStack(i).isIn(ItemTags.SWORDS)) return i;
+        }
+        return -1;
+    }
+    private int getDensityMaceSlot() {
+        int slot = densitySlot.getValueInt() - 1;
+        return isMaceInSlot(slot) ? slot : -1;
+    }
     private int getTargetMaceSlot() {
         int targetSlot;
         if (dualMace.getValue()) {
-            if (mc.player.fallDistance < maceHeightThreshold.getValue()) {
-                targetSlot = breachSlot.getValueInt() - 1;
-            } else {
-                targetSlot = densitySlot.getValueInt() - 1;
-            }
+            targetSlot = (mc.player.fallDistance < maceHeightThreshold.getValue())
+                    ? breachSlot.getValueInt() - 1
+                    : densitySlot.getValueInt() - 1;
         } else {
             targetSlot = breachSlot.getValueInt() - 1;
         }
         return isMaceInSlot(targetSlot) ? targetSlot : -1;
     }
-
     private boolean isValidTarget(Entity entity) {
         return entity instanceof LivingEntity && ((LivingEntity) entity).isAlive();
     }
-
     private boolean isTargetBlocking(Entity entity) {
         return entity instanceof LivingEntity && ((LivingEntity) entity).isBlocking();
     }
@@ -160,7 +187,6 @@ public final class MaceSwap extends Module implements AttackListener, TickListen
         mc.interactionManager.attackEntity(mc.player, target);
         mc.player.swingHand(Hand.MAIN_HAND);
     }
-
     private void updateShieldTracking(PlayerEntity target) {
         currentTarget = target;
         for (PlayerEntity player : mc.world.getPlayers()) {
@@ -168,142 +194,195 @@ public final class MaceSwap extends Module implements AttackListener, TickListen
             UUID uuid = player.getUuid();
             boolean isBlocking = player.isHolding(Items.SHIELD) && player.isBlocking();
             if (isBlocking) {
-                if (!shieldStartTimes.containsKey(uuid)) {
-                    shieldStartTimes.put(uuid, System.currentTimeMillis());
-                }
+                shieldStartTimes.putIfAbsent(uuid, System.currentTimeMillis());
             } else {
                 shieldStartTimes.remove(uuid);
             }
         }
     }
-
     private boolean shouldBreakShield(PlayerEntity target) {
         if (target == null) return false;
-        UUID uuid = target.getUuid();
-        if (!shieldStartTimes.containsKey(uuid)) return false;
-        long holdTime = System.currentTimeMillis() - shieldStartTimes.get(uuid);
-        return holdTime >= minShieldHold.getValue();
+        Long start = shieldStartTimes.get(target.getUuid());
+        return start != null && (System.currentTimeMillis() - start) >= minShieldHold.getValue();
     }
+    private boolean isHoldingDensityMace() {
+        int densityIndex = densitySlot.getValueInt() - 1;
+        return mc.player.getInventory().getSelectedSlot() == densityIndex
+                && isMaceInSlot(densityIndex);
+    }
+    private boolean isTargetHoldingShield(Entity entity) {
+        return entity instanceof PlayerEntity p && p.isHolding(Items.SHIELD) && p.isBlocking();
+    }
+    //Shield Nuker
+    private boolean canLatchVaporizer(Entity target) {
+        if (!shieldVaporizer.getValue()) return false;
+        if (stunSlam.getValue()) return false;
+        if (!isValidTarget(target)) return false;
+        if (mc.player.isOnGround()) return false;
+        if (mc.player.isGliding()) return false;
+        if (nukerDensityOnly.getValue() && !isHoldingDensityMace()) return false;
+        // Only engage if the target is actively holding a shield
+        if (!isTargetHoldingShield(target)) return false;
+        return mc.player.fallDistance >= VAPORIZER_MIN_FALL;
+    }
+    private void startVaporizer(Entity target) {
+        int maceSlot = getDensityMaceSlot();
+        if (maceSlot == -1) return;
 
-    private void startStunSlam(PlayerEntity target) {
-        if (sessionActive) {
-            if (shouldSwitchBack && originalSlot != -1) {
-                mc.player.getInventory().setSelectedSlot(originalSlot);
-            }
-            sessionActive = false;
-            autoSwapped = false;
+        if (originalSlot == -1) {
+            originalSlot = mc.player.getInventory().getSelectedSlot();
         }
+        vaporizerTarget  = target;
+        vaporizerActive  = true;
+        vaporizerRunning = true;
+        pendingClicks.set(0);
 
-        int currentSlot = mc.player.getInventory().getSelectedSlot();
-        if (switchBack.getValue()) {
-            originalSlot = currentSlot;
-        }
+        mc.player.getInventory().setSelectedSlot(maceSlot);
+        pendingClicks.incrementAndGet();
+        long intervalUs = (long) (1_000_000.0 / Math.max(1, vaporizerCps.getValueInt()));
+        vaporizerFuture = vaporizerExecutor.scheduleAtFixedRate(
+                () -> {
+                    if (vaporizerRunning) {
+                        pendingClicks.incrementAndGet();
+                    }
+                },
+                intervalUs,
+                intervalUs,
+                TimeUnit.MICROSECONDS
+        );
+    }
+    private void drainPendingClicks(Entity target) {
+        int clicks = pendingClicks.getAndSet(0);
+        if (clicks <= 0) return;
 
-        int axeSlot = findAxeSlot();
-        if (axeSlot == -1) {
+        int maceSlot = getDensityMaceSlot();
+        if (maceSlot == -1) {
+            stopVaporizer();
             return;
         }
-        mc.player.getInventory().setSelectedSlot(axeSlot);
-
-        // Phase 1: waiting to perform axe hit (same tick)
-        stunSlamActive = true;
-        stunSlamPhase = 1;
-        stunSlamTarget = target;
-        stunSlamAxeSlot = axeSlot;
+        if (mc.player.getInventory().getSelectedSlot() != maceSlot) {
+            mc.player.getInventory().setSelectedSlot(maceSlot);
+        }
+        for (int i = 0; i < clicks; i++) {
+            if (!isValidTarget(target)) break;
+            mc.interactionManager.attackEntity(mc.player, target);
+            mc.player.swingHand(Hand.MAIN_HAND);
+        }
     }
-
+    private void stopVaporizer() {
+        vaporizerRunning = false;
+        if (vaporizerFuture != null) {
+            vaporizerFuture.cancel(false);
+            vaporizerFuture = null;
+        }
+        pendingClicks.set(0);
+        if (vaporizerActive && originalSlot != -1) {
+            mc.player.getInventory().setSelectedSlot(originalSlot);
+        }
+        vaporizerActive = false;
+        vaporizerTarget = null;
+        originalSlot    = -1;
+    }
+    //StunSlam
+    private void startStunSlam(PlayerEntity target) {
+        if (sessionActive) {
+            if (shouldSwitchBack && originalSlot != -1)
+                mc.player.getInventory().setSelectedSlot(originalSlot);
+            sessionActive = false;
+            autoSwapped   = false;
+        }
+        int axeSlot = findAxeSlot();
+        if (axeSlot == -1) return;
+        int swordSlot = findSwordSlot();
+        if (originalSlot == -1)
+            originalSlot = (swordSlot != -1) ? swordSlot : mc.player.getInventory().getSelectedSlot();
+        slamAxeSlot   = axeSlot;
+        slamSwordSlot = swordSlot;
+        slamTarget    = target;
+        if (tickLock.getValue() && swordSlot != -1) {
+            mc.player.getInventory().setSelectedSlot(swordSlot);
+            slamTick       = 1;
+            slamTimerStart = System.currentTimeMillis();
+        } else {
+            mc.player.getInventory().setSelectedSlot(axeSlot);
+            slamTick = 2;
+        }
+    }
     private void continueStunSlam() {
-        if (mc.player == null || stunSlamTarget == null || !stunSlamTarget.isAlive()) {
+        if (mc.player == null || slamTarget == null || !slamTarget.isAlive()) {
             abortStunSlam();
             return;
         }
-
-        if (stunSlamPhase == 1) {
-            // Perform axe hit immediately
-            if (!(mc.crosshairTarget instanceof EntityHitResult entityHit) || entityHit.getEntity() != stunSlamTarget) {
-                abortStunSlam();
-                return;
-            }
-            if (mc.player.getInventory().getSelectedSlot() != stunSlamAxeSlot) {
-                abortStunSlam();
-                return;
-            }
-
-            performAttack(stunSlamTarget);
-            shieldStartTimes.remove(stunSlamTarget.getUuid());
-
-            // If no delay needed, go straight to mace phase
-            if (stunMaceDelayMs.getValueInt() <= 0) {
-                stunSlamPhase = 3; // skip delay
-            } else {
-                stunSlamPhase = 2;
-                stunSlamTimerStart = System.currentTimeMillis();
-            }
+        if (slamTick == 1) {
+            if (System.currentTimeMillis() - slamTimerStart < STUN_SWORD_DELAY_MS) return;
+            mc.player.getInventory().setSelectedSlot(slamAxeSlot);
+            slamTick = 2;
         }
-        else if (stunSlamPhase == 2) {
-            // Wait for delay before mace
-            long elapsed = System.currentTimeMillis() - stunSlamTimerStart;
-            if (elapsed >= stunMaceDelayMs.getValueInt()) {
-                stunSlamPhase = 3;
-            } else {
-                return; // still waiting
-            }
+        if (slamTick == 2) {
+            if (mc.player.getInventory().getSelectedSlot() != slamAxeSlot) { abortStunSlam(); return; }
+            if (!(mc.crosshairTarget instanceof EntityHitResult eh) || eh.getEntity() != slamTarget) { abortStunSlam(); return; }
+            performAttack(slamTarget);
+            shieldStartTimes.remove(slamTarget.getUuid());
+            slamTimerStart = System.currentTimeMillis();
+            slamTick       = 3;
+            if (stunMaceDelayMs.getValueInt() > 0) return;
         }
-
-        if (stunSlamPhase == 3) {
-            // Swap to mace and attack
+        if (slamTick == 3) {
+            if (System.currentTimeMillis() - slamTimerStart < stunMaceDelayMs.getValueInt()) return;
             int maceSlot = getTargetMaceSlot();
-            if (maceSlot == -1) {
-                abortStunSlam();
-                return;
-            }
+            if (maceSlot == -1) { abortStunSlam(); return; }
             mc.player.getInventory().setSelectedSlot(maceSlot);
-
-            if (!stunSlamTarget.isAlive() || !(mc.crosshairTarget instanceof EntityHitResult entityHit2) || entityHit2.getEntity() != stunSlamTarget) {
-                abortStunSlam();
-                return;
-            }
-
-            performAttack(stunSlamTarget);
-
+            if (!slamTarget.isAlive()) { abortStunSlam(); return; }
+            performAttack(slamTarget);
             if (switchBack.getValue()) {
                 shouldSwitchBack = true;
                 switchTimerStart = System.currentTimeMillis();
             } else {
                 originalSlot = -1;
             }
-
-            stunSlamActive = false;
-            stunSlamPhase = 0;
+            slamTick = 0;
         }
     }
-
     private void abortStunSlam() {
         if (switchBack.getValue() && originalSlot != -1) {
             mc.player.getInventory().setSelectedSlot(originalSlot);
             originalSlot = -1;
         }
-        stunSlamActive = false;
-        stunSlamPhase = 0;
-        stunSlamTarget = null;
+        slamTick      = 0;
+        slamTarget    = null;
+        slamAxeSlot   = -1;
+        slamSwordSlot = -1;
     }
-
+    //Events
     @Override
     public void onAttack(AttackEvent event) {
+        if (shieldVaporizer.getValue() && !stunSlam.getValue()) {
+            if (!mc.player.isOnGround() && !mc.player.isGliding()
+                    && mc.player.fallDistance >= VAPORIZER_MIN_FALL) {
+                if (nukerDensityOnly.getValue() && !isHoldingDensityMace()) {
+                    // density only is on but player isn't holding density mace — don't cancel
+                } else if (mc.crosshairTarget instanceof EntityHitResult er && isValidTarget(er.getEntity())) {
+                    // Density Only: also skip cancel if target isn't holding a shield
+                    if (nukerDensityOnly.getValue() && !isTargetHoldingShield(er.getEntity())) {
+                        // target has no shield, let the normal attack go through
+                    } else {
+                        event.cancel();
+                        return;
+                    }
+                }
+            }
+        }
         if (!alwaysSwap.getValue()) {
             if (mc.crosshairTarget == null || mc.crosshairTarget.getType() != HitResult.Type.ENTITY) return;
             Entity target = ((EntityHitResult) mc.crosshairTarget).getEntity();
             if (!isValidTarget(target)) return;
-
             boolean shieldEffective = false;
             if (target instanceof PlayerEntity && isTargetBlocking(target)) {
                 shieldEffective = !WorldUtils.isShieldFacingAway((PlayerEntity) target);
             }
-
             if (respectShield.getValue() && shieldEffective) return;
-
-            if (stunSlam.getValue() && shieldEffective && !respectShield.getValue() &&
-                    target instanceof PlayerEntity) {
+            if (stunSlam.getValue() && shieldEffective && !respectShield.getValue()
+                    && target instanceof PlayerEntity) {
                 if (mc.player.fallDistance >= STUN_MIN_FALL) {
                     startStunSlam((PlayerEntity) target);
                     event.cancel();
@@ -313,78 +392,77 @@ public final class MaceSwap extends Module implements AttackListener, TickListen
                 }
             }
         }
-
         if (autoBreach.getValue()) {
-            boolean isFalling = !mc.player.isOnGround() && mc.player.getVelocity().y < 0;
-            boolean isGliding = mc.player.isGliding();
+            boolean isFalling        = !mc.player.isOnGround() && mc.player.getVelocity().y < 0;
+            boolean isGliding        = mc.player.isGliding();
             boolean enoughFallHeight = mc.player.fallDistance >= minFallHeight.getValue();
-            if (!isFalling || isGliding || !enoughFallHeight) {
-                return;
-            }
+            if (!isFalling || isGliding || !enoughFallHeight) return;
         }
-
         ItemStack currentStack = mc.player.getMainHandStack();
-        boolean holdingSword = currentStack.isIn(ItemTags.SWORDS);
+        boolean holdingSword   = currentStack.isIn(ItemTags.SWORDS);
         if (swordOnly.getValue() && !holdingSword && !autoSwapped) return;
-
         if (shouldSwitchBack) {
-            // If we are waiting to switch back, just reset timer
             switchTimerStart = System.currentTimeMillis();
             return;
         }
-
         int targetSlot = getTargetMaceSlot();
         if (targetSlot == -1) return;
-
         if (switchBack.getValue() && originalSlot == -1) {
             originalSlot = mc.player.getInventory().getSelectedSlot();
         }
-
         if (mc.player.getInventory().getSelectedSlot() != targetSlot) {
             mc.player.getInventory().setSelectedSlot(targetSlot);
         }
-
         if (switchBack.getValue()) {
             shouldSwitchBack = true;
             switchTimerStart = System.currentTimeMillis();
         }
     }
-
     @Override
     public void onTick() {
-        // Handle stun slam progression
-        if (stunSlamActive) {
+        if (slamTick > 0) {
             continueStunSlam();
-            if (stunSlamActive) return; // still in progress, skip rest
+            if (slamTick > 0) return;
         }
-
-        // Flight monitoring
+        if (shieldVaporizer.getValue() && !stunSlam.getValue()) {
+            Entity crosshairEntity = null;
+            if (mc.crosshairTarget instanceof EntityHitResult er && isValidTarget(er.getEntity())) {
+                crosshairEntity = er.getEntity();
+            }
+            if (vaporizerActive) {
+                boolean targetLost = (crosshairEntity == null || crosshairEntity != vaporizerTarget);
+                boolean shieldDropped = vaporizerTarget != null && !isTargetHoldingShield(vaporizerTarget);
+                if (mc.player.isOnGround() || mc.player.isGliding() || targetLost || shieldDropped) {
+                    stopVaporizer();
+                } else {
+                    drainPendingClicks(vaporizerTarget);
+                }
+            } else if (crosshairEntity != null && canLatchVaporizer(crosshairEntity)) {
+                startVaporizer(crosshairEntity);
+                drainPendingClicks(crosshairEntity);
+            }
+        } else if (vaporizerActive) {
+            stopVaporizer();
+        }
         if (sessionActive && mc.player.isGliding()) {
             if (shouldSwitchBack && originalSlot != -1) {
                 mc.player.getInventory().setSelectedSlot(originalSlot);
             }
             resetState();
         }
-
-        // Auto‑swapped cleanup
         if (!autoBreach.getValue() && autoSwapped && !shouldSwitchBack) {
-            if (originalSlot != -1) {
-                mc.player.getInventory().setSelectedSlot(originalSlot);
-            }
+            if (originalSlot != -1) mc.player.getInventory().setSelectedSlot(originalSlot);
             resetState();
         }
-
-        // Shield tracking (if stun slam enabled)
         boolean handledBlockingPlayer = false;
         if (stunSlam.getValue() && autoBreach.getValue()) {
             PlayerEntity targetPlayer = null;
-            if (mc.crosshairTarget instanceof EntityHitResult entityHit &&
-                    entityHit.getEntity() instanceof PlayerEntity player &&
-                    player != mc.player && player.isAlive()) {
+            if (mc.crosshairTarget instanceof EntityHitResult entityHit
+                    && entityHit.getEntity() instanceof PlayerEntity player
+                    && player != mc.player && player.isAlive()) {
                 targetPlayer = player;
             }
             updateShieldTracking(targetPlayer);
-
             if (targetPlayer != null && shouldBreakShield(targetPlayer) && !respectShield.getValue()) {
                 boolean shieldEffective = !WorldUtils.isShieldFacingAway(targetPlayer);
                 if (shieldEffective) {
@@ -397,13 +475,10 @@ public final class MaceSwap extends Module implements AttackListener, TickListen
                 }
             }
         }
-
-        // Normal auto mace
         if (autoBreach.getValue() && !handledBlockingPlayer) {
             if (mc.currentScreen != null) return;
-
             ItemStack currentStack = mc.player.getMainHandStack();
-            boolean holdingSword = currentStack.isIn(ItemTags.SWORDS);
+            boolean holdingSword   = currentStack.isIn(ItemTags.SWORDS);
             if (swordOnly.getValue() && !holdingSword) {
                 if (autoSwapped && originalSlot != -1) {
                     mc.player.getInventory().setSelectedSlot(originalSlot);
@@ -411,50 +486,32 @@ public final class MaceSwap extends Module implements AttackListener, TickListen
                 }
                 return;
             }
-
-            boolean isFalling = !mc.player.isOnGround() && mc.player.getVelocity().y < 0;
-            boolean isGliding = mc.player.isGliding();
+            boolean isFalling        = !mc.player.isOnGround() && mc.player.getVelocity().y < 0;
+            boolean isGliding        = mc.player.isGliding();
             boolean enoughFallHeight = mc.player.fallDistance >= minFallHeight.getValue();
-
             if (!isFalling || isGliding || !enoughFallHeight) {
                 if (sessionActive) {
-                    if (shouldSwitchBack) {
-                        if (originalSlot != -1) mc.player.getInventory().setSelectedSlot(originalSlot);
-                        resetState();
-                    } else {
-                        resetState();
-                    }
+                    if (shouldSwitchBack && originalSlot != -1) mc.player.getInventory().setSelectedSlot(originalSlot);
+                    resetState();
                 }
                 return;
             }
-
-            boolean aimingAtValid = false;
             Entity target = null;
             if (mc.crosshairTarget instanceof EntityHitResult entityHit) {
                 Entity hitEntity = entityHit.getEntity();
-                if (isValidTarget(hitEntity)) {
-                    aimingAtValid = true;
-                    target = hitEntity;
-                }
+                if (isValidTarget(hitEntity)) target = hitEntity;
             }
-
-            if (!aimingAtValid) {
+            if (target == null) {
                 if (sessionActive) {
-                    if (shouldSwitchBack) {
-                        if (originalSlot != -1) mc.player.getInventory().setSelectedSlot(originalSlot);
-                        resetState();
-                    } else {
-                        resetState();
-                    }
+                    if (shouldSwitchBack && originalSlot != -1) mc.player.getInventory().setSelectedSlot(originalSlot);
+                    resetState();
                 }
                 return;
             }
-
             boolean shieldEffective = false;
             if (target instanceof PlayerEntity && isTargetBlocking(target)) {
                 shieldEffective = !WorldUtils.isShieldFacingAway((PlayerEntity) target);
             }
-
             if (respectShield.getValue() && shieldEffective) {
                 if (sessionActive) {
                     if (shouldSwitchBack && originalSlot != -1) mc.player.getInventory().setSelectedSlot(originalSlot);
@@ -462,7 +519,6 @@ public final class MaceSwap extends Module implements AttackListener, TickListen
                 }
                 return;
             }
-
             int targetSlot = getTargetMaceSlot();
             if (targetSlot == -1) {
                 if (sessionActive) {
@@ -489,34 +545,31 @@ public final class MaceSwap extends Module implements AttackListener, TickListen
             } else {
                 if (autoSwapped && currentSlot != targetSlot) {
                     sessionActive = false;
-                    autoSwapped = false;
-                    originalSlot = -1;
+                    autoSwapped   = false;
+                    originalSlot  = -1;
                 }
             }
         }
-
-        // Switch‑back timer (milliseconds)
         if (shouldSwitchBack && originalSlot != -1) {
             long elapsed = System.currentTimeMillis() - switchTimerStart;
-            if (elapsed < switchDelay.getValueInt()) {
-                return;
-            }
+            if (elapsed < switchDelay.getValueInt()) return;
             mc.player.getInventory().setSelectedSlot(originalSlot);
             shouldSwitchBack = false;
-            autoSwapped = false;
-            originalSlot = -1;
+            autoSwapped      = false;
+            originalSlot     = -1;
             switchTimerStart = 0;
         }
     }
-
     private void resetState() {
         shouldSwitchBack = false;
-        originalSlot = -1;
+        originalSlot     = -1;
         switchTimerStart = 0;
-        autoSwapped = false;
-        sessionActive = false;
-        stunSlamActive = false;
-        stunSlamPhase = 0;
-        stunSlamTarget = null;
+        autoSwapped      = false;
+        sessionActive    = false;
+        slamTick         = 0;
+        slamTimerStart   = 0;
+        slamTarget       = null;
+        slamAxeSlot      = -1;
+        slamSwordSlot    = -1;
     }
 }

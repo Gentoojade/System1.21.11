@@ -1,4 +1,4 @@
-package dlindustries.vigillant.system.module.modules.crystal;
+package dlindustries.vigillant.system.module.modules.client;
 
 import dlindustries.vigillant.system.event.events.TickListener;
 import dlindustries.vigillant.system.module.Category;
@@ -12,7 +12,6 @@ import dlindustries.vigillant.system.utils.KeyUtils;
 import net.minecraft.client.gui.screen.ChatScreen;
 
 public final class RekitMacro extends Module implements TickListener {
-
     private final StringSetting  message     = new StringSetting(EncryptedString.of("RekitCommand"), "/Kit1")
             .setDescription(EncryptedString.of("The servers kit getting command (k1, kit1, etc)"));
     private final KeybindSetting messageKey  = new KeybindSetting(EncryptedString.of("Rekit Key"), -1, false)
@@ -27,12 +26,11 @@ public final class RekitMacro extends Module implements TickListener {
     private long    lastSent   = 0;
     private int     stage      = 0;
     private long    stageStart = 0;
-
     public RekitMacro() {
         super(EncryptedString.of("RekitMacro"),
-                EncryptedString.of("Sends a command to rekit on keybind press"),
+                EncryptedString.of("Sends a command to rekit on keybind press, may not work in some servers, don't use while sprinting"),
                 -1,
-                Category.CRYSTAL);
+                Category.CLIENT);
         addSettings(message, messageKey, delay, silent, chatVisible);
     }
     @Override
@@ -52,7 +50,6 @@ public final class RekitMacro extends Module implements TickListener {
     @Override
     public void onTick() {
         if (mc.player == null) return;
-
         if (stage != 0) {
             long now = System.currentTimeMillis();
             switch (stage) {

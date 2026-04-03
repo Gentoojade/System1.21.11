@@ -18,6 +18,7 @@ public final class AutoJumpReset extends Module implements TickListener {
     private boolean isSimulatingKey = false;
     private int keyHoldTicks = 0;
     private int lastHurtTime = 0;
+    private float prevFallDistance = 0f;
     public AutoJumpReset() {
         super(EncryptedString.of("Jump Reset"),
                 EncryptedString.of("Human-like jump reset"),
@@ -43,6 +44,7 @@ public final class AutoJumpReset extends Module implements TickListener {
         isSimulatingKey = false;
         keyHoldTicks = 0;
         lastHurtTime = 0;
+        prevFallDistance = 0f;
         releaseJumpKey();
     }
     private void releaseJumpKey() {
@@ -54,9 +56,14 @@ public final class AutoJumpReset extends Module implements TickListener {
         long windowHandle = mc.getWindow().getHandle();
         return GLFW.glfwGetKey(windowHandle, GLFW.GLFW_KEY_S) == GLFW.GLFW_PRESS;
     }
+    private boolean isFallDamage() {
+        return prevFallDistance > 3.0f;
+    }
     @Override
     public void onTick() {
         if (mc.player == null || mc.world == null) return;
+        // Track fallDistance before it gets reset on landing
+        prevFallDistance = (float) mc.player.fallDistance;
         if (isSimulatingKey) {
             if (--keyHoldTicks <= 0) {
                 releaseJumpKey();
@@ -72,6 +79,8 @@ public final class AutoJumpReset extends Module implements TickListener {
             scheduledJumpTick = -1;
 
             if (mc.player.isOnGround()
+                    && !mc.player.isOnFire()
+                    && !isFallDamage()
                     && MathUtils.randomInt(1, 100) <= chance.getValueInt()
                     && (!disableOnS.getValue() || !isPressingS())) {
                 int delay = MathUtils.randomInt(2, 3);
@@ -83,6 +92,7 @@ public final class AutoJumpReset extends Module implements TickListener {
             if (mc.currentScreen == null
                     && !mc.player.isUsingItem()
                     && mc.player.isOnGround()
+                    && !mc.player.isOnFire()
                     && mc.player.hurtTime > 0
                     && (!disableOnS.getValue() || !isPressingS())) {
                 if (simulateKey.getValue()) {

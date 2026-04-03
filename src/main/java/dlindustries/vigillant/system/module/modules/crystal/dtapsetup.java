@@ -34,7 +34,7 @@ public final class dtapsetup extends Module implements TickListener, ItemUseList
 			.setDescription(EncryptedString.of("Makes the CPS hud think you're legit"));
 	private final BooleanSetting swordSwap = new BooleanSetting(EncryptedString.of("Sword Swap"), true);
 	private final BooleanSetting noAir = new BooleanSetting(EncryptedString.of("No Air"), true)
-			.setDescription(EncryptedString.of("Doesn't crystal if in air"));
+			.setDescription(EncryptedString.of("Doesn't crystal if in air, useful to not Dtap yourself"));
 	private int placeClock = 0;
 	private int switchClock = 0;
 	private boolean active;

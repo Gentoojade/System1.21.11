@@ -32,15 +32,12 @@ public final class NameProtect extends Module {
         if (string == null || !isEnabled() || mode.getMode() == Mode.OFF) {
             return string;
         }
-
         MinecraftClient client = MinecraftClient.getInstance();
         String localName = client.getSession().getUsername();
-
         switch (mode.getMode()) {
             case SELF:
                 return replaceNames(string, localName, selfName.getValue());
-
-            case EVERYONE:
+                case EVERYONE:
                 if (client.world == null) return string;
                 List<String> names = new ArrayList<>();
                 for (var player : client.world.getPlayers()) {
